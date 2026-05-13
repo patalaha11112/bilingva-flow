@@ -10,7 +10,7 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-lg">
       <div className="mx-auto flex h-14 max-w-lg items-center justify-between px-4">
         <Link href="/" className="text-xl font-bold tracking-tight">
-          LinguaFlow
+          Bilingva Flow AI
         </Link>
         <div className="flex items-center gap-1">
           <ThemeToggle />
