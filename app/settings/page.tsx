@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft, Check } from 'lucide-react'
 import Link from 'next/link'
 import { useApp } from '@/core'
@@ -29,6 +30,7 @@ import {
 import { cn } from '@/lib/utils'
 
 export default function SettingsPage() {
+  const router = useRouter()
   const { state, updateProfile, toggleInterest, resetProgress, translate } = useApp()
   const { profile } = state
   const lang = profile.interfaceLanguage
@@ -63,11 +65,9 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex h-14 max-w-lg items-center gap-3 px-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
           <h1 className="text-lg font-semibold">{translate('settingsTitle')}</h1>
         </div>
       </header>
