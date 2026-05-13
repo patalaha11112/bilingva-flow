@@ -85,9 +85,6 @@ export default function LoginPage() {
           <Button variant="outline" className="w-full" onClick={handleGoogle}>
             Войти через Google
           </Button>
-          <Button variant="outline" className="w-full" onClick={handleApple}>
-            Войти через Apple
-          </Button>
         </div>
 
         <p className="text-center text-sm text-muted-foreground">
