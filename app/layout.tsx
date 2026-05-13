@@ -10,7 +10,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'LinguaFlow',
+  title: 'Bilingva Flow AI',
   description: 'Learn languages naturally with daily practice',
 }
 
