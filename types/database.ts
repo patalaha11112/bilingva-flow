@@ -10,7 +10,7 @@
 export type InterfaceLang = 'ru' | 'en' | 'es'
 export type LearningLang = 'es' | 'en'
 export type Level = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'
-export type AIModel = 'claude' | 'gpt'
+export type AIModel = 'claude' | 'gpt' | 'gemini'
 export type SavedItemType = 'word' | 'sentence'
 export type DayActivityType = 'dialog' | 'essay'
 export type DescriptionQuality = 'detailed' | 'topic' | 'watched'
