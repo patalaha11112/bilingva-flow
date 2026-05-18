@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HomeTopSection } from '@/components/home-top-section'
+import { ActivityArchive } from '@/components/activity-archive'
+
 
 export default function Home() {
   const router = useRouter()
@@ -58,11 +60,14 @@ export default function Home() {
 
       {/* Week rings */}
       <section className="rounded-2xl bg-card p-4 shadow-sm">
-        <h2 className="mb-4 text-sm font-medium text-muted-foreground">
-          {t('weekProgress', lang)}
-        </h2>
-        <WeekProgress activity={weekActivity} lang={lang} />
-      </section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-medium text-muted-foreground">
+              {t('weekProgress', lang)}
+            </h2>
+            <ActivityArchive lang={lang} userId={profile.id} />
+          </div>
+          <WeekProgress activity={weekActivity} lang={lang} />
+        </section>
 
       {/* Today's task */}
       <section className="space-y-3">
