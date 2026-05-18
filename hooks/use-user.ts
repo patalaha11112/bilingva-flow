@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import type {
   UserProfile,
@@ -11,6 +12,7 @@ import type {
 } from '@/types/database'
 
 interface UseUserReturn {
+  user: User | null
   profile: UserProfile | null
   activeLanguage: UserLanguageSettings | null
   stats: UserStats
@@ -26,6 +28,7 @@ interface UseUserReturn {
 export function useUser(): UseUserReturn {
   const supabase = createClient()
 
+  const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [activeLanguage, setActiveLanguageState] = useState<UserLanguageSettings | null>(null)
   const [stats, setStats] = useState<UserStats>({
@@ -43,29 +46,36 @@ export function useUser(): UseUserReturn {
       setIsLoading(true)
       setError(null)
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) {
+        setUser(null)
         setProfile(null)
         return
       }
+
+      setUser(authUser)
 
       // Profile
       const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', user.id)
-        .single()
+        .eq('id', authUser.id)
+        .maybeSingle()
 
-      if (profileError) throw profileError
-      setProfile(profileData)
+      if (profileError) {
+        console.error('profile fetch:', profileError)
+        setProfile(null)
+      } else {
+        setProfile(profileData ?? null)
+      }
 
       // Active language settings
       const { data: langData } = await supabase
         .from('user_language_settings')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', authUser.id)
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
 
       if (langData) setActiveLanguageState(langData)
 
@@ -77,7 +87,7 @@ export function useUser(): UseUserReturn {
       const { data: analyticsData } = await supabase
         .from('user_weekly_analytics')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', authUser.id)
         .eq('week_number', weekNumber)
         .eq('year', year)
         .maybeSingle()
@@ -98,7 +108,7 @@ export function useUser(): UseUserReturn {
       const { data: activityData } = await supabase
         .from('user_daily_activity')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', authUser.id)
         .in('date', weekDates.map(d => d.toISOString().split('T')[0]))
 
       const activity: WeekActivity[] = weekDates.map(date => {
@@ -183,6 +193,7 @@ export function useUser(): UseUserReturn {
   }
 
   return {
+    user,
     profile,
     activeLanguage,
     stats,

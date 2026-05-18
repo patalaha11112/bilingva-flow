@@ -13,18 +13,24 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 export default function Home() {
   const router = useRouter()
-  const { profile, activeLanguage, stats, weekActivity, isLoading, error } = useUser()
+  const { user, profile, activeLanguage, stats, weekActivity, isLoading, error } = useUser()
 
-  // Если нет юзера — редирект на логин
   useEffect(() => {
-    if (!isLoading && !profile) {
+    if (!isLoading && !user) {
       router.push('/login')
     }
-  }, [isLoading, profile, router])
+  }, [isLoading, user, router])
 
   if (isLoading) return <HomeSkeletons />
-  if (!profile) return null
+  if (!user) return null
   if (error) return <ErrorState message={error} />
+  if (!profile) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-20 text-center">
+        <p className="text-muted-foreground">Завершите настройку профиля…</p>
+      </div>
+    )
+  }
 
   const lang = profile.interface_language
   const level = activeLanguage?.level ?? 'A1'
