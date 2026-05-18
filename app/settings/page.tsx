@@ -1,12 +1,10 @@
 'use client'
 
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Check } from 'lucide-react'
-import Link from 'next/link'
-import { useApp } from '@/core'
-import { INTERESTS, LEVELS, LEVEL_DESCRIPTIONS } from '@/core/constants'
-import type { InterfaceLanguage, LearningLanguage, Level, Interest } from '@/core/types'
+import { useUser } from '@/hooks/use-user'
+import { t } from '@/lib/i18n'
+import { LEVELS, LEVEL_DESCRIPTIONS } from '@/core/constants'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -28,66 +26,68 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
+import type { InterfaceLang, LearningLang, Level } from '@/types/database'
+
+const INTERFACE_LANGS: { value: InterfaceLang; label: string; flag: string }[] = [
+  { value: 'ru', label: 'Русский', flag: '🇷🇺' },
+  { value: 'en', label: 'English', flag: '🇺🇸' },
+  { value: 'es', label: 'Español', flag: '🇪🇸' },
+]
+
+const LEARNING_LANGS: { value: LearningLang; flag: string; labelKey: 'lang_es' | 'lang_en' }[] = [
+  { value: 'es', flag: '🇪🇸', labelKey: 'lang_es' },
+  { value: 'en', flag: '🇺🇸', labelKey: 'lang_en' },
+]
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { state, updateProfile, toggleInterest, resetProgress, translate } = useApp()
-  const { profile } = state
-  const lang = profile.interfaceLanguage
+  const { profile, activeLanguage, updateProfile, updateLevel, setActiveLanguage, isLoading } = useUser()
 
-  const interfaceLanguages: { value: InterfaceLanguage; label: string; flag: string }[] = [
-    { value: 'ru', label: 'Русский', flag: '🇷🇺' },
-    { value: 'en', label: 'English', flag: '🇺🇸' },
-    { value: 'es', label: 'Español', flag: '🇪🇸' },
-  ]
+  const lang: InterfaceLang = profile?.interface_language ?? 'ru'
+  const level: Level = activeLanguage?.level ?? 'A1'
+  const learningLang: LearningLang = activeLanguage?.learning_language ?? 'es'
 
-  const learningLanguages: { value: LearningLanguage; labelKey: 'spanish' | 'english'; flag: string }[] = [
-    { value: 'spanish', labelKey: 'spanish', flag: '🇪🇸' },
-    { value: 'english', labelKey: 'english', flag: '🇺🇸' },
-  ]
-
-  const getInterestLabel = (id: Interest) => {
-    const interest = INTERESTS.find(i => i.id === id)
-    if (!interest) return id
-    if (lang === 'ru') return interest.labelRu
-    if (lang === 'es') return interest.labelEs
-    return interest.labelEn
-  }
-
-  const getLevelDescription = (level: Level) => {
-    const desc = LEVEL_DESCRIPTIONS[level]
+  const getLevelDescription = (lvl: Level) => {
+    const desc = LEVEL_DESCRIPTIONS[lvl]
     if (lang === 'ru') return desc.ru
     if (lang === 'es') return desc.es
     return desc.en
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <SettingsHeader onBack={() => router.back()} title={t('settingsTitle', lang)} />
+        <div className="mx-auto max-w-lg p-4 space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-lg">
-        <div className="mx-auto flex h-14 max-w-lg items-center gap-3 px-4">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-          <h1 className="text-lg font-semibold">{translate('settingsTitle')}</h1>
-        </div>
-      </header>
+      <SettingsHeader onBack={() => router.back()} title={t('settingsTitle', lang)} />
 
       <main className="mx-auto max-w-lg space-y-4 p-4">
+
         {/* Interface Language */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">{translate('interfaceLanguage')}</CardTitle>
+            <CardTitle className="text-base">{t('interfaceLanguage', lang)}</CardTitle>
           </CardHeader>
           <CardContent>
             <Select
-              value={profile.interfaceLanguage}
-              onValueChange={(value: InterfaceLanguage) => updateProfile({ interfaceLanguage: value })}
+              value={lang}
+              onValueChange={(val: InterfaceLang) => updateProfile({ interface_language: val })}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {interfaceLanguages.map(({ value, label, flag }) => (
+                {INTERFACE_LANGS.map(({ value, label, flag }) => (
                   <SelectItem key={value} value={value}>
                     {flag} {label}
                   </SelectItem>
@@ -100,20 +100,20 @@ export default function SettingsPage() {
         {/* Learning Language */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">{translate('learningLanguage')}</CardTitle>
+            <CardTitle className="text-base">{t('learningLanguage', lang)}</CardTitle>
           </CardHeader>
           <CardContent>
             <Select
-              value={profile.learningLanguage}
-              onValueChange={(value: LearningLanguage) => updateProfile({ learningLanguage: value })}
+              value={learningLang}
+              onValueChange={(val: LearningLang) => setActiveLanguage(val)}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {learningLanguages.map(({ value, labelKey, flag }) => (
+                {LEARNING_LANGS.map(({ value, flag, labelKey }) => (
                   <SelectItem key={value} value={value}>
-                    {flag} {translate(labelKey)}
+                    {flag} {t(labelKey, lang)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -124,20 +124,20 @@ export default function SettingsPage() {
         {/* Level */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">{translate('level')}</CardTitle>
+            <CardTitle className="text-base">{t('level', lang)}</CardTitle>
           </CardHeader>
           <CardContent>
             <Select
-              value={profile.level}
-              onValueChange={(value: Level) => updateProfile({ level: value })}
+              value={level}
+              onValueChange={(val: Level) => updateLevel(learningLang, val)}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {LEVELS.map(level => (
-                  <SelectItem key={level} value={level}>
-                    {level} — {getLevelDescription(level)}
+                {LEVELS.map(lvl => (
+                  <SelectItem key={lvl} value={lvl}>
+                    {lvl} — {getLevelDescription(lvl)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -145,89 +145,65 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Interests */}
+        {/* App Color (placeholder for future) */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">{translate('interests')}</CardTitle>
+            <CardTitle className="text-base text-muted-foreground text-sm">
+              {t('comingSoon', lang)}: персонализация цвета
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {INTERESTS.map(interest => {
-                const isSelected = profile.interests.includes(interest.id)
-                return (
-                  <button
-                    key={interest.id}
-                    onClick={() => toggleInterest(interest.id)}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
-                      isSelected
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    )}
-                  >
-                    {isSelected && <Check className="h-3.5 w-3.5" />}
-                    {getInterestLabel(interest.id)}
-                  </button>
-                )
-              })}
-            </div>
-          </CardContent>
         </Card>
 
-        {/* Sentences per week */}
-        <Card>
+        {/* Danger zone */}
+        <Card className="border-destructive/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">{translate('sentencesPerWeek')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select
-              value={profile.sentencesPerWeek.toString()}
-              onValueChange={(value) => updateProfile({ sentencesPerWeek: parseInt(value) })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[7, 10, 14, 21].map(num => (
-                  <SelectItem key={num} value={num.toString()}>
-                    {num}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-
-        {/* Reset Progress */}
-        <Card className="border-destructive/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base text-destructive">{translate('resetProgress')}</CardTitle>
+            <CardTitle className="text-base text-destructive">{t('resetProgress', lang)}</CardTitle>
           </CardHeader>
           <CardContent>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="w-full">
-                  {translate('reset')}
+                  {t('reset', lang)}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{translate('resetConfirmTitle')}</AlertDialogTitle>
+                  <AlertDialogTitle>{t('resetConfirmTitle', lang)}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    {translate('resetConfirmMessage')}
+                    {t('resetConfirmMessage', lang)}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>{translate('cancel')}</AlertDialogCancel>
-                  <AlertDialogAction onClick={resetProgress}>
-                    {translate('confirm')}
+                  <AlertDialogCancel>{t('cancel', lang)}</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      // TODO: реальный сброс — удаление всех user_sentences, user_dialog_sessions и т.д.
+                      // Пока просто закрываем
+                    }}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    {t('confirm', lang)}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           </CardContent>
         </Card>
+
       </main>
     </div>
+  )
+}
+
+function SettingsHeader({ onBack, title }: { onBack: () => void; title: string }) {
+  return (
+    <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-lg">
+      <div className="mx-auto flex h-14 max-w-lg items-center gap-3 px-4">
+        <Button variant="ghost" size="icon" onClick={onBack}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <h1 className="text-lg font-semibold">{title}</h1>
+      </div>
+    </header>
   )
 }

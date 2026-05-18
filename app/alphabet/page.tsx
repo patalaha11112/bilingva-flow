@@ -1,22 +1,30 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useApp } from '@/core/app-context'
+import { useUser } from '@/hooks/use-user'
 import { getAlphabetData, type Letter, type Digraph } from '@/core/alphabet-data'
 import { cn } from '@/lib/utils'
+import type { LearningLang, InterfaceLang } from '@/types/database'
+
+// Маппинг из новых типов БД в старый формат alphabet-data
+function toLegacyLang(lang: LearningLang): 'spanish' | 'english' {
+  return lang === 'es' ? 'spanish' : 'english'
+}
 
 export default function AlphabetPage() {
-  const { state } = useApp()
-  const { profile } = state
-  
+  const { profile, activeLanguage } = useUser()
+
+  const learningLang: LearningLang = activeLanguage?.learning_language ?? 'es'
+  const interfaceLang: InterfaceLang = profile?.interface_language ?? 'ru'
+
   const [selected, setSelected] = useState<Letter | Digraph | null>(null)
   const [explanation, setExplanation] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isCached, setIsCached] = useState(false)
   const [error, setError] = useState('')
   const [speaking, setSpeaking] = useState(false)
 
-  const alphabetData = getAlphabetData(profile.learningLanguage)
-  const interfaceLang = profile.interfaceLanguage
+  const alphabetData = getAlphabetData(toLegacyLang(learningLang))
 
   const speak = (text: string) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return
@@ -45,13 +53,14 @@ export default function AlphabetPage() {
     setSelected(null)
     setExplanation('')
     setError('')
-  }, [profile.learningLanguage])
+  }, [learningLang])
 
   const fetchExplanation = async (letterObj: Letter | Digraph) => {
     if (selected?.letter === letterObj.letter && explanation) return
     setSelected(letterObj)
     setExplanation('')
     setError('')
+    setIsCached(false)
     setLoading(true)
 
     try {
@@ -61,7 +70,7 @@ export default function AlphabetPage() {
         body: JSON.stringify({
           letter: letterObj.letter,
           name: letterObj.name,
-          learningLanguage: profile.learningLanguage,
+          learningLanguage: learningLang,
           interfaceLanguage: interfaceLang,
         }),
       })
@@ -69,21 +78,12 @@ export default function AlphabetPage() {
       const data = await response.json()
       if (data.explanation) {
         setExplanation(data.explanation)
-      } else if (data.error) {
-        setError(data.error)
+        setIsCached(data.cached === true)
       } else {
-        setError(interfaceLang === 'ru' 
-          ? 'Не удалось получить объяснение' 
-          : interfaceLang === 'en' 
-            ? 'Failed to get explanation' 
-            : 'No se pudo obtener la explicación')
+        setError(uiText.error[interfaceLang])
       }
     } catch {
-      setError(interfaceLang === 'ru' 
-        ? 'Ошибка соединения' 
-        : interfaceLang === 'en' 
-          ? 'Connection error' 
-          : 'Error de conexión')
+      setError(uiText.connError[interfaceLang])
     } finally {
       setLoading(false)
     }
@@ -102,30 +102,25 @@ export default function AlphabetPage() {
     })
   }
 
-  const isSpecial = (item: Letter | Digraph): boolean => {
-    return 'isSpecial' in item && !!item.isSpecial
-  }
+  const isSpecial = (item: Letter | Digraph): boolean =>
+    'isSpecial' in item && !!item.isSpecial
 
   return (
     <div className="flex min-h-[calc(100vh-120px)] flex-col bg-[#0e0c09] text-[#f0e6d3] font-serif">
       {/* Header */}
       <header className="border-b border-[#2a2520] bg-gradient-to-b from-[#1a1510] to-[#0e0c09] px-6 py-8 text-center">
         <div className="mb-3 text-3xl tracking-widest">{alphabetData.flag}</div>
-        <h1 className="font-display text-3xl font-black tracking-tight md:text-4xl">
+        <h1 className="text-3xl font-black tracking-tight md:text-4xl">
           {alphabetData.title[interfaceLang]}
         </h1>
         <p className="mt-2 text-sm italic text-[#7a6e62]">
-          {interfaceLang === 'ru' 
-            ? 'Нажми на букву — Claude объяснит как читается' 
-            : interfaceLang === 'en'
-              ? 'Click a letter — Claude will explain pronunciation'
-              : 'Haz clic en una letra — Claude explicará la pronunciación'}
+          {uiText.subtitle[interfaceLang]}
         </p>
       </header>
 
-      {/* Main content */}
+      {/* Main */}
       <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[1fr_1.4fr]">
-        {/* Left panel - Letters */}
+        {/* Left — Letters */}
         <div className="overflow-y-auto border-r border-[#2a2520] px-5 py-6">
           <div className="mb-4 text-xs uppercase tracking-widest text-[#5a5048]">
             {alphabetData.subtitle[interfaceLang]}
@@ -136,12 +131,12 @@ export default function AlphabetPage() {
                 key={l.letter}
                 onClick={() => fetchExplanation(l)}
                 className={cn(
-                  "flex aspect-square flex-col items-center justify-center gap-0.5 rounded border transition-all cursor-pointer",
-                  "bg-[#141210] hover:bg-[#1e1a14] hover:-translate-y-0.5",
-                  l.isSpecial 
-                    ? "border-[#3d2e1c] text-[#c9813a]" 
-                    : "border-[#2a2520] text-[#c4b8aa]",
-                  selected?.letter === l.letter && "border-[#c9813a] bg-[#1e1a14] shadow-lg shadow-[#c9813a]/10"
+                  'flex aspect-square flex-col items-center justify-center gap-0.5 rounded border transition-all cursor-pointer',
+                  'bg-[#141210] hover:bg-[#1e1a14] hover:-translate-y-0.5',
+                  l.isSpecial
+                    ? 'border-[#3d2e1c] text-[#c9813a]'
+                    : 'border-[#2a2520] text-[#c4b8aa]',
+                  selected?.letter === l.letter && 'border-[#c9813a] bg-[#1e1a14] shadow-lg shadow-[#c9813a]/10'
                 )}
               >
                 <span className="text-xl font-bold leading-none">{l.letter}</span>
@@ -154,7 +149,7 @@ export default function AlphabetPage() {
 
           {/* Digraphs */}
           <div className="mt-6 text-xs uppercase tracking-widest text-[#5a5048]">
-            {interfaceLang === 'ru' ? 'Диграфы' : interfaceLang === 'en' ? 'Digraphs' : 'Dígrafos'}
+            {uiText.digraphs[interfaceLang]}
           </div>
           <div className="mt-1 mb-3 text-[0.7rem] italic text-[#5a5048]/70">
             {alphabetData.digraphNote[interfaceLang]}
@@ -165,10 +160,10 @@ export default function AlphabetPage() {
                 key={d.letter}
                 onClick={() => fetchExplanation(d)}
                 className={cn(
-                  "flex aspect-square flex-col items-center justify-center gap-0.5 rounded border transition-all cursor-pointer",
-                  "border-[#3d2e1c] bg-[#141210] text-[#c9813a]",
-                  "hover:bg-[#1e1a14] hover:-translate-y-0.5",
-                  selected?.letter === d.letter && "border-[#c9813a] bg-[#1e1a14] shadow-lg shadow-[#c9813a]/10"
+                  'flex aspect-square flex-col items-center justify-center gap-0.5 rounded border transition-all cursor-pointer',
+                  'border-[#3d2e1c] bg-[#141210] text-[#c9813a]',
+                  'hover:bg-[#1e1a14] hover:-translate-y-0.5',
+                  selected?.letter === d.letter && 'border-[#c9813a] bg-[#1e1a14] shadow-lg shadow-[#c9813a]/10'
                 )}
               >
                 <span className="text-lg font-bold leading-none">{d.letter}</span>
@@ -180,18 +175,12 @@ export default function AlphabetPage() {
           </div>
         </div>
 
-        {/* Right panel - Explanation */}
+        {/* Right — Explanation */}
         <div className="flex flex-col overflow-y-auto bg-[#0e0c09] px-6 py-8 md:px-8">
           {!selected ? (
             <div className="m-auto text-center text-[#3a342e]">
               <div className="text-7xl font-black leading-none opacity-30">Aa</div>
-              <p className="mt-3 text-sm italic">
-                {interfaceLang === 'ru' 
-                  ? 'Выбери любую букву слева' 
-                  : interfaceLang === 'en'
-                    ? 'Select any letter on the left'
-                    : 'Selecciona cualquier letra'}
-              </p>
+              <p className="mt-3 text-sm italic">{uiText.selectHint[interfaceLang]}</p>
             </div>
           ) : (
             <>
@@ -203,15 +192,11 @@ export default function AlphabetPage() {
                 <div className="flex flex-col gap-1">
                   <div className="text-xl font-semibold">{selected.name}</div>
                   <div className="text-sm italic text-[#7a6e62]">
-                    {interfaceLang === 'ru' ? '≈' : '≈'} «{selected.sound[interfaceLang]}»
+                    ≈ «{selected.sound[interfaceLang]}»
                   </div>
                   {isSpecial(selected) && (
                     <span className="mt-1 inline-block w-fit rounded border border-[#3d2e1c] bg-[#2a1e0e] px-2 py-0.5 text-[0.65rem] uppercase tracking-widest text-[#c9813a]">
-                      {interfaceLang === 'ru' 
-                        ? 'с особенностями' 
-                        : interfaceLang === 'en'
-                          ? 'has quirks'
-                          : 'con peculiaridades'}
+                      {uiText.hasQuirks[interfaceLang]}
                     </span>
                   )}
                   {/* Audio buttons */}
@@ -219,55 +204,60 @@ export default function AlphabetPage() {
                     <button
                       onClick={() => speak(selected.letter)}
                       className={cn(
-                        "rounded border border-[#3d2e1c] bg-[#1e1a14] px-3 py-1.5 text-xs text-[#c9813a] transition-all cursor-pointer",
-                        "hover:border-[#c9813a] hover:bg-[#2a1e0e]",
-                        speaking && "border-[#c9813a] shadow-md shadow-[#c9813a]/20"
+                        'rounded border border-[#3d2e1c] bg-[#1e1a14] px-3 py-1.5 text-xs text-[#c9813a] transition-all cursor-pointer',
+                        'hover:border-[#c9813a] hover:bg-[#2a1e0e]',
+                        speaking && 'border-[#c9813a] shadow-md shadow-[#c9813a]/20'
                       )}
                     >
-                      {speaking ? '🔊' : '🔈'} {interfaceLang === 'ru' ? 'Буква' : interfaceLang === 'en' ? 'Letter' : 'Letra'}
+                      {speaking ? '🔊' : '🔈'} {uiText.playLetter[interfaceLang]}
                     </button>
                     <button
                       onClick={() => speak(selected.name)}
                       className={cn(
-                        "rounded border border-[#3d2e1c] bg-[#1e1a14] px-3 py-1.5 text-xs text-[#c9813a] transition-all cursor-pointer",
-                        "hover:border-[#c9813a] hover:bg-[#2a1e0e]",
-                        speaking && "border-[#c9813a] shadow-md shadow-[#c9813a]/20"
+                        'rounded border border-[#3d2e1c] bg-[#1e1a14] px-3 py-1.5 text-xs text-[#c9813a] transition-all cursor-pointer',
+                        'hover:border-[#c9813a] hover:bg-[#2a1e0e]',
+                        speaking && 'border-[#c9813a] shadow-md shadow-[#c9813a]/20'
                       )}
                     >
-                      {speaking ? '🔊' : '🔈'} {interfaceLang === 'ru' ? 'Название' : interfaceLang === 'en' ? 'Name' : 'Nombre'}
+                      {speaking ? '🔊' : '🔈'} {uiText.playName[interfaceLang]}
                     </button>
                     <button
                       onClick={stopSpeaking}
                       className="rounded border border-[#2a2520] bg-[#1e1a14] px-3 py-1.5 text-xs text-[#7a6e62] transition-all cursor-pointer hover:border-[#5a5048] hover:text-[#f0e6d3]"
                     >
-                      ■ {interfaceLang === 'ru' ? 'Стоп' : 'Stop'}
+                      ■ {uiText.stop[interfaceLang]}
                     </button>
                   </div>
                 </div>
               </div>
 
               {/* Explanation label */}
-              <div className="mb-4 text-xs uppercase tracking-widest text-[#3a342e]">
-                {interfaceLang === 'ru' 
-                  ? 'Объяснение от Claude' 
-                  : interfaceLang === 'en'
-                    ? 'Explanation by Claude'
-                    : 'Explicación de Claude'}
+              <div className="mb-4 flex items-center gap-2 text-xs uppercase tracking-widest text-[#3a342e]">
+                <span>{uiText.explanationBy[interfaceLang]}</span>
+                {isCached && (
+                  <span className="rounded bg-[#1e1a14] border border-[#2a2520] px-1.5 py-0.5 text-[#5a5048] normal-case tracking-normal">
+                    {uiText.cached[interfaceLang]}
+                  </span>
+                )}
               </div>
 
               {/* Loading */}
               {loading && (
                 <div className="flex gap-2 py-4">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-[#c9813a]" style={{ animationDelay: '0ms' }} />
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-[#c9813a]" style={{ animationDelay: '200ms' }} />
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-[#c9813a]" style={{ animationDelay: '400ms' }} />
+                  {[0, 200, 400].map(delay => (
+                    <span
+                      key={delay}
+                      className="h-2 w-2 animate-pulse rounded-full bg-[#c9813a]"
+                      style={{ animationDelay: `${delay}ms` }}
+                    />
+                  ))}
                 </div>
               )}
 
               {/* Error */}
               {error && <p className="text-sm italic text-red-400">{error}</p>}
 
-              {/* Explanation content */}
+              {/* Content */}
               {explanation && !loading && (
                 <div className="text-[0.95rem] leading-relaxed text-[#c4b8aa]">
                   {renderExplanation(explanation)}
@@ -279,4 +269,65 @@ export default function AlphabetPage() {
       </div>
     </div>
   )
+}
+
+// ─────────────────────────────────────────────
+// UI strings (вместо хардкода по всему файлу)
+// ─────────────────────────────────────────────
+const uiText: Record<string, Record<InterfaceLang, string>> = {
+  subtitle: {
+    ru: 'Нажми на букву — Claude объяснит как читается',
+    en: 'Click a letter — Claude will explain pronunciation',
+    es: 'Haz clic en una letra — Claude explicará la pronunciación',
+  },
+  digraphs: {
+    ru: 'Диграфы',
+    en: 'Digraphs',
+    es: 'Dígrafos',
+  },
+  selectHint: {
+    ru: 'Выбери любую букву слева',
+    en: 'Select any letter on the left',
+    es: 'Selecciona cualquier letra',
+  },
+  hasQuirks: {
+    ru: 'с особенностями',
+    en: 'has quirks',
+    es: 'con peculiaridades',
+  },
+  playLetter: {
+    ru: 'Буква',
+    en: 'Letter',
+    es: 'Letra',
+  },
+  playName: {
+    ru: 'Название',
+    en: 'Name',
+    es: 'Nombre',
+  },
+  stop: {
+    ru: 'Стоп',
+    en: 'Stop',
+    es: 'Parar',
+  },
+  explanationBy: {
+    ru: 'Объяснение от Claude',
+    en: 'Explanation by Claude',
+    es: 'Explicación de Claude',
+  },
+  cached: {
+    ru: 'из кэша',
+    en: 'cached',
+    es: 'del caché',
+  },
+  error: {
+    ru: 'Не удалось получить объяснение',
+    en: 'Failed to get explanation',
+    es: 'No se pudo obtener la explicación',
+  },
+  connError: {
+    ru: 'Ошибка соединения',
+    en: 'Connection error',
+    es: 'Error de conexión',
+  },
 }
