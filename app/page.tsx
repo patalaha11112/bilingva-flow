@@ -10,6 +10,7 @@ import { t } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { HomeTopSection } from '@/components/home-top-section'
 
 export default function Home() {
   const router = useRouter()
@@ -47,51 +48,13 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-lg space-y-5 px-4 py-6">
 
-      {/* Language + Level card */}
-      <section className="flex gap-3">
-        <div className="flex-1 rounded-2xl bg-card p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground mb-1">{t('learningLanguage', lang)}</p>
-          <p className="text-lg font-semibold">
-            {learningLang === 'es' ? '🇪🇸' : '🇺🇸'} {t(learningLang === 'es' ? 'lang_es' : 'lang_en', lang)}
-          </p>
-        </div>
-        <div className="flex-1 rounded-2xl bg-card p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground mb-1">{t('yourLevel', lang)}</p>
-          <div className="flex items-center justify-between">
-            <p className="text-lg font-semibold">{level}</p>
-            <Link
-              href="/settings"
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
-            >
-              {t('change', lang)} <ChevronRight className="h-3 w-3" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats */}
-      <section className="grid grid-cols-4 gap-2">
-        <StatCard
-          icon={<BookOpen className="h-4 w-4 text-[var(--ring-blue)]" />}
-          value={stats.sentences_completed}
-          label={t('sentences_stat', lang)}
-        />
-        <StatCard
-          icon={<MessageSquare className="h-4 w-4 text-[var(--ring-green)]" />}
-          value={stats.dialogs_completed}
-          label={t('dialogs_stat', lang)}
-        />
-        <StatCard
-          icon={<PenLine className="h-4 w-4 text-muted-foreground" />}
-          value={stats.essays_completed}
-          label={t('essays_stat', lang)}
-        />
-        <StatCard
-          icon={<Video className="h-4 w-4 text-[var(--ring-orange)]" />}
-          value={stats.videos_completed}
-          label={t('videos_stat', lang)}
-        />
-      </section>
+    {/* Home top section */}
+      <HomeTopSection
+        lang={lang}
+        learningLang={learningLang}
+        level={level}
+        stats={stats}
+      />
 
       {/* Week rings */}
       <section className="rounded-2xl bg-card p-4 shadow-sm">
