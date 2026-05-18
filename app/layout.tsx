@@ -1,13 +1,11 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
-import { AppProvider } from '@/core'
 import { Header } from '@/components/header'
 import { BottomNav } from '@/components/bottom-nav'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const geist = Geist({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Bilingva Flow AI',
@@ -42,14 +40,12 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="font-sans antialiased bg-background">
-        <AppProvider>
-          <Header />
-          <main className="pb-20">
-            {children}
-          </main>
-          <BottomNav />
-        </AppProvider>
+      <body className={`${geist.className} antialiased bg-background`}>
+        <Header />
+        <main className="pb-20">
+          {children}
+        </main>
+        <BottomNav />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

@@ -1,0 +1,172 @@
+import type { InterfaceLang } from '@/types/database'
+
+export type TranslationKey =
+  // Nav
+  | 'home' | 'alphabet' | 'sentences' | 'practice' | 'video'
+  // Days
+  | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
+  // Home page
+  | 'weekProgress' | 'thisWeek' | 'todayTask' | 'startExercise'
+  | 'sentences_stat' | 'dialogs_stat' | 'essays_stat' | 'videos_stat'
+  | 'tipOfDay'
+  // Legend
+  | 'legend_sentences' | 'legend_dialog' | 'legend_video'
+  // Activity
+  | 'activity_full' | 'activity_partial' | 'activity_empty'
+  // Level card
+  | 'yourLevel' | 'learningLanguage' | 'change'
+  // Common
+  | 'loading' | 'error_loading' | 'comingSoon'
+  // Languages
+  | 'lang_es' | 'lang_en'
+  // Settings
+  | 'settings' | 'settingsTitle' | 'interfaceLanguage' | 'level'
+  | 'save' | 'cancel' | 'confirm' | 'reset' | 'resetProgress'
+  | 'resetConfirmTitle' | 'resetConfirmMessage'
+  | 'interests' | 'sentencesPerWeek'
+  | 'spanish' | 'english'
+
+const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
+  ru: {
+    home: 'Главная',
+    alphabet: 'Алфавит',
+    sentences: 'Предложения',
+    practice: 'Практика',
+    video: 'Видео',
+    mon: 'Пн', tue: 'Вт', wed: 'Ср', thu: 'Чт', fri: 'Пт', sat: 'Сб', sun: 'Вс',
+    weekProgress: 'Активность недели',
+    thisWeek: 'Эта неделя',
+    todayTask: 'Сегодня',
+    startExercise: 'Начать упражнение',
+    sentences_stat: 'Предложений',
+    dialogs_stat: 'Диалогов',
+    essays_stat: 'Эссе',
+    videos_stat: 'Видео',
+    tipOfDay: 'Совет дня',
+    legend_sentences: 'Предложения',
+    legend_dialog: 'Диалог',
+    legend_video: 'Видео',
+    activity_full: 'Всё выполнено',
+    activity_partial: 'Частично',
+    activity_empty: 'Не выполнено',
+    yourLevel: 'Ваш уровень',
+    learningLanguage: 'Язык',
+    change: 'Изменить',
+    loading: 'Загрузка...',
+    error_loading: 'Ошибка загрузки',
+    comingSoon: 'Скоро',
+    lang_es: 'Испанский',
+    lang_en: 'Английский',
+    settings: 'Настройки',
+    settingsTitle: 'Настройки',
+    interfaceLanguage: 'Язык интерфейса',
+    level: 'Уровень',
+    save: 'Сохранить',
+    cancel: 'Отмена',
+    confirm: 'Подтвердить',
+    reset: 'Сбросить',
+    resetProgress: 'Сбросить прогресс',
+    resetConfirmTitle: 'Сбросить прогресс?',
+    resetConfirmMessage: 'Все данные будут удалены. Это действие нельзя отменить.',
+    interests: 'Интересы',
+    sentencesPerWeek: 'Предложений в неделю',
+    spanish: 'Испанский',
+    english: 'Английский',
+  },
+  en: {
+    home: 'Home',
+    alphabet: 'Alphabet',
+    sentences: 'Sentences',
+    practice: 'Practice',
+    video: 'Video',
+    mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun',
+    weekProgress: 'Weekly Activity',
+    thisWeek: 'This week',
+    todayTask: 'Today',
+    startExercise: 'Start Exercise',
+    sentences_stat: 'Sentences',
+    dialogs_stat: 'Dialogs',
+    essays_stat: 'Essays',
+    videos_stat: 'Videos',
+    tipOfDay: 'Tip of the Day',
+    legend_sentences: 'Sentences',
+    legend_dialog: 'Dialog',
+    legend_video: 'Video',
+    activity_full: 'All done',
+    activity_partial: 'Partial',
+    activity_empty: 'Not done',
+    yourLevel: 'Your level',
+    learningLanguage: 'Language',
+    change: 'Change',
+    loading: 'Loading...',
+    error_loading: 'Failed to load',
+    comingSoon: 'Coming Soon',
+    lang_es: 'Spanish',
+    lang_en: 'English',
+    settings: 'Settings',
+    settingsTitle: 'Settings',
+    interfaceLanguage: 'Interface Language',
+    level: 'Level',
+    save: 'Save',
+    cancel: 'Cancel',
+    confirm: 'Confirm',
+    reset: 'Reset',
+    resetProgress: 'Reset Progress',
+    resetConfirmTitle: 'Reset Progress?',
+    resetConfirmMessage: 'All data will be deleted. This cannot be undone.',
+    interests: 'Interests',
+    sentencesPerWeek: 'Sentences per week',
+    spanish: 'Spanish',
+    english: 'English',
+  },
+  es: {
+    home: 'Inicio',
+    alphabet: 'Alfabeto',
+    sentences: 'Oraciones',
+    practice: 'Práctica',
+    video: 'Video',
+    mon: 'Lun', tue: 'Mar', wed: 'Mié', thu: 'Jue', fri: 'Vie', sat: 'Sáb', sun: 'Dom',
+    weekProgress: 'Actividad semanal',
+    thisWeek: 'Esta semana',
+    todayTask: 'Hoy',
+    startExercise: 'Empezar ejercicio',
+    sentences_stat: 'Oraciones',
+    dialogs_stat: 'Diálogos',
+    essays_stat: 'Ensayos',
+    videos_stat: 'Videos',
+    tipOfDay: 'Consejo del día',
+    legend_sentences: 'Oraciones',
+    legend_dialog: 'Diálogo',
+    legend_video: 'Video',
+    activity_full: 'Todo hecho',
+    activity_partial: 'Parcial',
+    activity_empty: 'Sin actividad',
+    yourLevel: 'Tu nivel',
+    learningLanguage: 'Idioma',
+    change: 'Cambiar',
+    loading: 'Cargando...',
+    error_loading: 'Error al cargar',
+    comingSoon: 'Próximamente',
+    lang_es: 'Español',
+    lang_en: 'Inglés',
+    settings: 'Ajustes',
+    settingsTitle: 'Ajustes',
+    interfaceLanguage: 'Idioma de interfaz',
+    level: 'Nivel',
+    save: 'Guardar',
+    cancel: 'Cancelar',
+    confirm: 'Confirmar',
+    reset: 'Restablecer',
+    resetProgress: 'Restablecer progreso',
+    resetConfirmTitle: '¿Restablecer progreso?',
+    resetConfirmMessage: 'Todos los datos serán eliminados. Esta acción no se puede deshacer.',
+    interests: 'Intereses',
+    sentencesPerWeek: 'Oraciones por semana',
+    spanish: 'Español',
+    english: 'Inglés',
+  },
+}
+
+export function t(key: TranslationKey, lang: InterfaceLang = 'ru'): string {
+  return translations[lang]?.[key] ?? key
+}
