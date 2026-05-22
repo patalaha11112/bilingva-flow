@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       level,
       topicName,
       interfaceLanguage: interface_language,
-      count: 20,
+      count: 5,
     });
 
     if (!generated.length) {
