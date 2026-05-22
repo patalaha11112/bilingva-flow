@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type {
   LearningLang,
@@ -13,6 +14,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const supabaseAdmin = createAdminClient();
 
     // Auth check
     const {
@@ -111,7 +113,7 @@ export async function POST(request: NextRequest) {
 
     for (const s of generated) {
       // Сохраняем предложение
-      const { data: sentenceRow, error: sentenceErr } = await supabase
+      const { data: sentenceRow, error: sentenceErr } = await supabaseAdmin
         .from("sentences")
         .insert({
           language,
@@ -121,7 +123,7 @@ export async function POST(request: NextRequest) {
           sentence_text: s.sentence_text,
           translation_ru: s.translation_ru,
           translation_en: s.translation_en ?? null,
-          ai_model: "gemini", // gemini помечаем как gpt для совместимости
+          ai_model: "gemini",
         })
         .select()
         .single();
@@ -134,7 +136,7 @@ export async function POST(request: NextRequest) {
 
       // Сохраняем части
       if (s.parts.length > 0) {
-        const { error: partsErr } = await supabase.from("sentence_parts").insert(
+        const { error: partsErr } = await supabaseAdmin.from("sentence_parts").insert(
           s.parts.map((part, index) => ({
             sentence_id: sentenceRow.id,
             order_index: index,
@@ -153,7 +155,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Подгружаем с частями
-      const { data: full, error: fetchErr } = await supabase
+      const { data: full, error: fetchErr } = await supabaseAdmin
         .from("sentences")
         .select("*, sentence_parts(*)")
         .eq("id", sentenceRow.id)
