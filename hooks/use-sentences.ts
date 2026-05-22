@@ -24,6 +24,7 @@ interface UseSentencesReturn {
   markPartUnderstood: (sentenceId: string, partId: string) => Promise<void>
   markAllUnderstood: (sentenceId: string) => Promise<void>
   nextSentence: () => void
+  addMoreSentences: () => Promise<void>
   refetch: () => Promise<void>
 }
 
@@ -217,6 +218,77 @@ export function useSentences({
     }
   }
 
+  // Добавить ещё предложения (без замены текущих)
+  const addMoreSentences = async () => {
+    if (!enabled) return
+
+    try {
+      setIsGenerating(true)
+      setError(null)
+
+      const res = await fetch('/api/sentences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language,
+          level,
+          topic_id: topicId,
+          custom_topic: customTopic,
+          interface_language: interfaceLanguage,
+          get_new: true, // Параметр, чтобы получить новые предложения
+        }),
+      })
+
+      if (!res.ok) {
+        let errorMsg = 'Failed to fetch more sentences'
+        try {
+          const errData = await res.json() as { error?: string; details?: string }
+          if (errData && errData.error) {
+            errorMsg = errData.details ? `${errData.error}: ${errData.details}` : errData.error
+          }
+        } catch {}
+        throw new Error(errorMsg)
+      }
+
+      const data = await res.json() as { sentences: SentenceWithParts[] }
+
+      // Сортируем части по order_index
+      const sorted = data.sentences.map(s => ({
+        ...s,
+        sentence_parts: [...(s.sentence_parts ?? [])].sort(
+          (a, b) => a.order_index - b.order_index
+        ),
+      }))
+
+      // Добавляем новые предложения к существующим
+      setSentences(prev => [...prev, ...sorted])
+
+      // Загружаем прогресс пользователя по новым предложениям
+      if (sorted.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const ids = sorted.map(s => s.id)
+        const { data: progressData } = await supabase
+          .from('user_sentences')
+          .select('*')
+          .eq('user_id', user.id)
+          .in('sentence_id', ids)
+
+        const newProgress: Record<string, UserSentence> = {}
+        for (const p of progressData ?? []) {
+          newProgress[p.sentence_id] = p
+        }
+        setUserProgress(prev => ({ ...prev, ...newProgress }))
+      }
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   return {
     sentences,
     currentSentence: sentences[currentIndex] ?? null,
@@ -228,6 +300,7 @@ export function useSentences({
     markPartUnderstood,
     markAllUnderstood,
     nextSentence,
+    addMoreSentences,
     refetch: fetchSentences,
   }
 }

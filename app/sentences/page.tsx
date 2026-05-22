@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Volume2, ChevronRight, Check, Plus, ArrowLeft, Loader2 } from 'lucide-react'
+import { Volume2, ChevronRight, Check, Plus, ArrowLeft, Loader2, RefreshCw } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { useUser } from '@/hooks/use-user'
 import { useSentences } from '@/hooks/use-sentences'
@@ -39,6 +39,7 @@ export default function SentencesPage() {
     markPartUnderstood,
     markAllUnderstood,
     nextSentence,
+    addMoreSentences,
     refetch,
   } = useSentences({
     language,
@@ -86,11 +87,13 @@ export default function SentencesPage() {
       lang={lang}
       level={level}
       language={language}
+      isGenerating={isGenerating}
       onStartTrain={() => {
         setTrainIndex(0)
         setMode('train')
       }}
-      onAddMore={nextSentence}
+      onAddMore={addMoreSentences}
+      onRefresh={refetch}
     />
   )
 }
@@ -153,16 +156,20 @@ function ListView({
   lang,
   level,
   language,
+  isGenerating,
   onStartTrain,
   onAddMore,
+  onRefresh,
 }: {
   sentences: SentenceWithParts[]
   userProgress: Record<string, any>
   lang: InterfaceLang
   level: Level
   language: string
+  isGenerating: boolean
   onStartTrain: () => void
   onAddMore: () => void
+  onRefresh: () => void
 }) {
   const ui = UI[lang] ?? UI.ru
   const MAX_SENTENCES = 10
@@ -178,8 +185,18 @@ function ListView({
             {language === 'es' ? '🇪🇸' : '🇺🇸'} {level}
           </p>
         </div>
-        <div className="text-sm font-medium text-muted-foreground">
-          {sentences.length} {ui.progress === 'Прогресс' ? 'предл.' : ui.progress === 'Progress' ? 'sent.' : 'or.'}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onRefresh}
+            disabled={isGenerating}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={lang === 'ru' ? 'Обновить предложения' : lang === 'es' ? 'Actualizar sugerencias' : 'Refresh suggestions'}
+          >
+            <RefreshCw className={cn('h-4 w-4', isGenerating && 'animate-spin')} />
+          </button>
+          <div className="text-sm font-medium text-muted-foreground">
+            {sentences.length} {ui.progress === 'Прогресс' ? 'предл.' : ui.progress === 'Progress' ? 'sent.' : 'or.'}
+          </div>
         </div>
       </div>
 
@@ -258,9 +275,17 @@ function ListView({
       {sentences.length < MAX_SENTENCES && (
         <button
           onClick={onAddMore}
-          className="w-full rounded-2xl border border-dashed border-border py-3 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary active:scale-[0.98]"
+          disabled={isGenerating}
+          className="w-full rounded-2xl border border-dashed border-border py-3 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {ui.addMore}
+          {isGenerating ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {lang === 'ru' ? 'Генерируем...' : lang === 'es' ? 'Generando...' : 'Generating...'}
+            </>
+          ) : (
+            ui.addMore
+          )}
         </button>
       )}
 

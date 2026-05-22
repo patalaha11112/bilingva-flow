@@ -43,13 +43,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { language, level, topic_id, custom_topic, interface_language } =
+    const { language, level, topic_id, custom_topic, interface_language, get_new } =
       (await request.json()) as {
         language: LearningLang;
         level: Level;
         topic_id?: string;
         custom_topic?: string;
         interface_language: InterfaceLang;
+        get_new?: boolean;
       };
 
     const weekStart = getWeekStartDate();
@@ -68,8 +69,8 @@ export async function POST(request: NextRequest) {
       (r) => r.sentence_id
     );
 
-    // Если уже есть предложения на эту неделю — возвращаем их
-    if (weekSentenceIds.length >= 5) {
+    // Если уже есть предложения на эту неделю И не запрашивают новые — возвращаем их
+    if (weekSentenceIds.length >= 5 && !get_new) {
       const { data: weekSentences } = await supabase
         .from("sentences")
         .select(
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     // Если есть часть предложений — загружаем их, чтобы потом дополнить
     let existingSentences: any[] = [];
-    if (weekSentenceIds.length > 0) {
+    if (weekSentenceIds.length > 0 && !get_new) {
       const { data } = await supabase
         .from("sentences")
         .select(
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
       existingSentences = data ?? [];
     }
 
-    const needed = 5 - weekSentenceIds.length;
+    const needed = get_new ? 3 : 5 - weekSentenceIds.length;
 
     // ─────────────────────────────────────────
     // 2. Ищем неиспользованные предложения в БД
