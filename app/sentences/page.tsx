@@ -469,8 +469,6 @@ function PartCard({
   onTap: () => void
   onSpeak: () => void
 }) {
-  const [expanded, setExpanded] = useState(false)
-
   return (
     <div
       className={cn(
@@ -501,19 +499,8 @@ function PartCard({
             {part.translation_ru}
           </p>
 
-          {/* Explanation — toggle */}
+          {/* Explanation + tip — always visible */}
           {(part.explanation || part.tip) && (
-            <button
-              onClick={e => { e.stopPropagation(); setExpanded(p => !p) }}
-              className="mt-1.5 text-xs text-primary/70 hover:text-primary transition-colors"
-            >
-              {expanded
-                ? (lang === 'ru' ? '▲ Скрыть' : lang === 'es' ? '▲ Ocultar' : '▲ Hide')
-                : (lang === 'ru' ? '▼ Подробнее' : lang === 'es' ? '▼ Más info' : '▼ More')}
-            </button>
-          )}
-
-          {expanded && (
             <div className="mt-2 space-y-1.5">
               {part.explanation && (
                 <p className="text-xs leading-relaxed text-foreground/80">

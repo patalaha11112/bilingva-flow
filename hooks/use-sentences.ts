@@ -140,10 +140,14 @@ export function useSentences({
     const current = userProgress[sentenceId]
     const currentParts = current?.understood_parts ?? []
 
-    // Уже отмечена
-    if (currentParts.includes(partId)) return
+    // Тоггл: если уже отмечена — убираем, иначе добавляем
+    let newParts: string[]
+    if (currentParts.includes(partId)) {
+      newParts = currentParts.filter(id => id !== partId)
+    } else {
+      newParts = [...currentParts, partId]
+    }
 
-    const newParts = [...currentParts, partId]
     const sentence = sentences.find(s => s.id === sentenceId)
     const totalParts = sentence?.sentence_parts?.length ?? 0
     const allUnderstood = newParts.length >= totalParts
@@ -167,7 +171,7 @@ export function useSentences({
     }
   }
 
-  // Отметить все части как понятые
+  // Отметить все части как понятые (тоггл: если все уже отмечены — снять все)
   const markAllUnderstood = async (sentenceId: string) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -177,6 +181,12 @@ export function useSentences({
 
     const allPartIds = (sentence.sentence_parts ?? []).map(p => p.id)
     const current = userProgress[sentenceId]
+    const currentParts = current?.understood_parts ?? []
+
+    // Тоггл: если все уже отмечены — снимаем все, иначе отмечаем все
+    const isAllCurrentlyUnderstood = currentParts.length >= allPartIds.length
+    const newParts = isAllCurrentlyUnderstood ? [] : allPartIds
+    const allUnderstood = !isAllCurrentlyUnderstood
 
     const { data, error } = await supabase
       .from('user_sentences')
@@ -184,8 +194,8 @@ export function useSentences({
         user_id: user.id,
         sentence_id: sentenceId,
         language,
-        understood_parts: allPartIds,
-        all_understood: true,
+        understood_parts: newParts,
+        all_understood: allUnderstood,
         times_shown: (current?.times_shown ?? 0) + (current ? 0 : 1),
         last_shown_at: new Date().toISOString(),
       }, { onConflict: 'user_id,sentence_id' })
