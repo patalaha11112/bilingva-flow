@@ -21,15 +21,6 @@ function getISOWeek(date: Date): { week: number; year: number } {
   return { week, year: d.getUTCFullYear() };
 }
 
-// Получить начало текущей ISO-недели (понедельник)
-function getWeekStartDate(): string {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday
-  const monday = new Date(now.getFullYear(), now.getMonth(), diff);
-  return monday.toISOString().split('T')[0];
-}
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -43,249 +34,335 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { language, level, topic_id, custom_topic, interface_language, get_new } =
+    const { language, level, topic_id, custom_topic, interface_language, refresh } =
       (await request.json()) as {
         language: LearningLang;
         level: Level;
         topic_id?: string;
         custom_topic?: string;
         interface_language: InterfaceLang;
-        get_new?: boolean;
+        refresh?: boolean;
       };
 
-    const weekStart = getWeekStartDate();
+    const { week: currentWeek, year: currentYear } = getISOWeek(new Date());
 
     // ─────────────────────────────────────────
-    // 1. Проверяем, есть ли у пользователя предложения на эту неделю
+    // 1. Get active sentences for this week
     // ─────────────────────────────────────────
-    const { data: existingUserSentences } = await supabase
-      .from("user_sentences")
-      .select("sentence_id")
-      .eq("user_id", user.id)
-      .eq("language", language)
-      .gte("first_seen_at", weekStart);
+    if (!refresh) {
+      const { data: activeSentences } = await supabase
+        .from("user_sentences")
+        .select("sentence_id")
+        .eq("user_id", user.id)
+        .eq("language", language)
+        .eq("week_number", currentWeek)
+        .eq("year", currentYear)
+        .eq("is_active", true);
 
-    const weekSentenceIds = (existingUserSentences ?? []).map(
-      (r) => r.sentence_id
-    );
+      const activeSentenceIds = (activeSentences ?? []).map((r) => r.sentence_id);
 
-    // Если уже есть предложения на эту неделю И не запрашивают новые — возвращаем их
-    if (weekSentenceIds.length >= 5 && !get_new) {
-      const { data: weekSentences } = await supabase
-        .from("sentences")
-        .select(
-          "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
-        )
-        .in("id", weekSentenceIds)
-        .order("created_at", { ascending: true });
+      // If we have 5 active sentences, return them
+      if (activeSentenceIds.length >= 5) {
+        const { data: sentencesData } = await supabase
+          .from("sentences")
+          .select(
+            "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, visual_svg, sentence_parts(*)"
+          )
+          .in("id", activeSentenceIds.slice(0, 5));
 
-      return NextResponse.json({
-        sentences: weekSentences ?? [],
-        generated: false,
-      });
-    }
-
-    // Если есть часть предложений — загружаем их, чтобы потом дополнить
-    let existingSentences: any[] = [];
-    if (weekSentenceIds.length > 0 && !get_new) {
-      const { data } = await supabase
-        .from("sentences")
-        .select(
-          "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
-        )
-        .in("id", weekSentenceIds)
-        .order("created_at", { ascending: true });
-      existingSentences = data ?? [];
-    }
-
-    const needed = get_new ? 3 : 5 - weekSentenceIds.length;
-
-    // ─────────────────────────────────────────
-    // 2. Ищем неиспользованные предложения в БД
-    // ─────────────────────────────────────────
-    const { data: allSeenIds } = await supabase
-      .from("user_sentences")
-      .select("sentence_id")
-      .eq("user_id", user.id)
-      .eq("language", language);
-
-    const seenSet = new Set((allSeenIds ?? []).map((r) => r.sentence_id));
-
-    const query = supabase
-      .from("sentences")
-      .select(
-        "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
-      )
-      .eq("language", language)
-      .eq("level", level)
-      .order("created_at", { ascending: true });
-
-    if (topic_id) query.eq("topic_id", topic_id);
-    if (custom_topic) query.eq("custom_topic", custom_topic);
-
-    const { data: allSentences } = await query;
-
-    const unseen = (allSentences ?? []).filter((s) => !seenSet.has(s.id));
-
-    let newSentences: any[] = [];
-
-    if (unseen.length >= needed) {
-      // Достаточно из БД
-      newSentences = unseen.slice(0, needed);
-    } else {
-      // Берём что есть + генерируем остальные
-      newSentences = unseen.slice(0, needed);
-      const toGenerate = needed - newSentences.length;
-
-      if (toGenerate > 0) {
-        // ─────────────────────────────────────────
-        // 3. Генерация через Gemini
-        // ─────────────────────────────────────────
-        let topicName = custom_topic ?? "";
-
-        if (!topicName && topic_id) {
-          const { data: topicData } = await supabase
-            .from("topics")
-            .select("name_ru, name_en, name_es")
-            .eq("id", topic_id)
-            .single();
-
-          if (topicData) {
-            topicName =
-              interface_language === "ru"
-                ? topicData.name_ru
-                : interface_language === "es"
-                  ? topicData.name_es
-                  : topicData.name_en;
-          }
-        }
-
-        const generated = await generateSentences({
-          language,
-          level,
-          topicName,
-          interfaceLanguage: interface_language,
-          count: toGenerate,
+        return NextResponse.json({
+          sentences: sentencesData ?? [],
+          generated: false,
+          weeklyLimit: {
+            total: activeSentences.length,
+            max: 10,
+          },
         });
-
-        // ─────────────────────────────────────────
-        // 4. Сохраняем в Supabase
-        // ─────────────────────────────────────────
-        let lastDbError = null;
-
-        for (const s of generated) {
-          const { data: sentenceRow, error: sentenceErr } = await supabaseAdmin
-            .from("sentences")
-            .insert({
-              language,
-              level,
-              topic_id: topic_id ?? null,
-              custom_topic: custom_topic ?? null,
-              sentence_text: s.sentence_text,
-              translation_ru: s.translation_ru,
-              translation_en: s.translation_en ?? null,
-              visual_svg: s.visual_svg ?? null,
-              ai_model: "gemini",
-            })
-            .select()
-            .single();
-
-          if (sentenceErr || !sentenceRow) {
-            console.error("Supabase sentence insert error:", sentenceErr);
-            lastDbError = sentenceErr;
-            continue;
-          }
-
-          if (s.parts.length > 0) {
-            const { error: partsErr } = await supabaseAdmin
-              .from("sentence_parts")
-              .insert(
-                s.parts.map((part, index) => ({
-                  sentence_id: sentenceRow.id,
-                  order_index: index,
-                  text: part.text,
-                  translation_ru: part.translation_ru,
-                  translation_en: part.translation_en ?? null,
-                  pronunciation: part.pronunciation,
-                  explanation: part.explanation ?? null,
-                  tip: part.tip ?? null,
-                }))
-              );
-            if (partsErr) {
-              console.error("Supabase sentence parts insert error:", partsErr);
-              lastDbError = partsErr;
-            }
-          }
-
-          const { data: full, error: fetchErr } = await supabaseAdmin
-            .from("sentences")
-            .select("*, sentence_parts(*)")
-            .eq("id", sentenceRow.id)
-            .single();
-
-          if (fetchErr) {
-            console.error("Supabase fetch full sentence error:", fetchErr);
-            lastDbError = fetchErr;
-          }
-
-          if (full) newSentences.push(full);
-        }
-
-        if (generated.length > 0 && newSentences.length === 0 && existingSentences.length === 0) {
-          return NextResponse.json(
-            {
-              error: "Failed to save generated sentences to database",
-              details: lastDbError ? lastDbError.message : "Unknown database error",
-              rawError: lastDbError,
-            },
-            { status: 500 }
-          );
-        }
       }
-    }
 
-    // ─────────────────────────────────────────
-    // 5. Привязываем новые предложения к пользователю (текущая неделя)
-    // ─────────────────────────────────────────
-    for (const s of newSentences) {
-      await supabaseAdmin.from("user_sentences").upsert(
-        {
+      // If we have less than 5, load them and fill up to 5
+      let existingSentences: any[] = [];
+      if (activeSentenceIds.length > 0) {
+        const { data } = await supabase
+          .from("sentences")
+          .select(
+            "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, visual_svg, sentence_parts(*)"
+          )
+          .in("id", activeSentenceIds);
+        existingSentences = data ?? [];
+      }
+
+      const needed = 5 - existingSentences.length;
+
+      // Get new sentences
+      const newSentences = await getNewSentences(
+        supabase,
+        supabaseAdmin,
+        user.id,
+        language,
+        level,
+        topic_id,
+        custom_topic,
+        interface_language,
+        needed
+      );
+
+      // Save new sentences to user_sentences with current week info
+      for (const s of newSentences) {
+        await supabaseAdmin.from("user_sentences").insert({
           user_id: user.id,
           sentence_id: s.id,
           language,
           understood_parts: [],
           all_understood: false,
-          times_shown: 1,
-          last_shown_at: new Date().toISOString(),
+          times_shown: 0,
+          last_shown_at: null,
           fully_mastered: false,
+          first_seen_at: new Date().toISOString(),
+          is_active: true,
+          week_number: currentWeek,
+          year: currentYear,
+        });
+      }
+
+      const totalSentences = [...existingSentences, ...newSentences];
+      return NextResponse.json({
+        sentences: totalSentences,
+        generated: newSentences.length > 0,
+        weeklyLimit: {
+          total: activeSentenceIds.length + newSentences.length,
+          max: 10,
         },
-        { onConflict: "user_id,sentence_id" }
-      );
+      });
     }
 
-    const allWeekSentences = [...existingSentences, ...newSentences];
+    // ─────────────────────────────────────────
+    // 2. REFRESH: Deactivate old, get 5 new
+    // ─────────────────────────────────────────
+    if (refresh) {
+      // Check total active count before refresh
+      const { data: currentActive } = await supabase
+        .from("user_sentences")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("language", language)
+        .eq("week_number", currentWeek)
+        .eq("year", currentYear)
+        .eq("is_active", true);
 
-    return NextResponse.json({
-      sentences: allWeekSentences,
-      generated: newSentences.length > 0,
-      total: allWeekSentences.length,
-    });
+      // Deactivate all current active sentences
+      if (currentActive && currentActive.length > 0) {
+        const currentActiveIds = currentActive.map((r) => r.id);
+        await supabaseAdmin
+          .from("user_sentences")
+          .update({ is_active: false })
+          .in("id", currentActiveIds);
+      }
+
+      // Check if we can add more (max 10 per week)
+      const { data: allThisWeek } = await supabase
+        .from("user_sentences")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("language", language)
+        .eq("week_number", currentWeek)
+        .eq("year", currentYear);
+
+      if ((allThisWeek?.length ?? 0) >= 10) {
+        return NextResponse.json({
+          sentences: [],
+          generated: false,
+          error: "Weekly limit reached",
+          weeklyLimit: {
+            total: allThisWeek?.length ?? 10,
+            max: 10,
+          },
+        });
+      }
+
+      // Get 5 new sentences
+      const newSentences = await getNewSentences(
+        supabase,
+        supabaseAdmin,
+        user.id,
+        language,
+        level,
+        topic_id,
+        custom_topic,
+        interface_language,
+        5
+      );
+
+      // Save with current week info
+      for (const s of newSentences) {
+        await supabaseAdmin.from("user_sentences").insert({
+          user_id: user.id,
+          sentence_id: s.id,
+          language,
+          understood_parts: [],
+          all_understood: false,
+          times_shown: 0,
+          last_shown_at: null,
+          fully_mastered: false,
+          first_seen_at: new Date().toISOString(),
+          is_active: true,
+          week_number: currentWeek,
+          year: currentYear,
+        });
+      }
+
+      return NextResponse.json({
+        sentences: newSentences,
+        generated: true,
+        weeklyLimit: {
+          total: (allThisWeek?.length ?? 0) + newSentences.length,
+          max: 10,
+        },
+      });
+    }
+
+    return NextResponse.json(
+      { error: "Invalid request" },
+      { status: 400 }
+    );
   } catch (error) {
-    console.error("Sentences generate error:", error);
+    console.error("Sentences error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Internal error",
-        details: error,
       },
       { status: 500 }
     );
   }
 }
 
-// ─────────────────────────────────────────────
-// Gemini generation
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────
+// Helper: Get new sentences
+// ─────────────────────────────────────────
+async function getNewSentences(
+  supabase: any,
+  supabaseAdmin: any,
+  userId: string,
+  language: LearningLang,
+  level: Level,
+  topicId: string | undefined,
+  customTopic: string | undefined,
+  interfaceLanguage: InterfaceLang,
+  count: number
+) {
+  // Get sentences user has already seen
+  const { data: seenData } = await supabase
+    .from("user_sentences")
+    .select("sentence_id")
+    .eq("user_id", userId)
+    .eq("language", language);
 
+  const seenSet = new Set((seenData ?? []).map((r: any) => r.sentence_id));
+
+  // Query available sentences
+  let query = supabase
+    .from("sentences")
+    .select(
+      "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, visual_svg, sentence_parts(*)"
+    )
+    .eq("language", language)
+    .eq("level", level);
+
+  if (topicId) query = query.eq("topic_id", topicId);
+  if (customTopic) query = query.eq("custom_topic", customTopic);
+
+  const { data: allSentences } = await query;
+
+  // Filter unseen
+  const unseen = (allSentences ?? []).filter((s: any) => !seenSet.has(s.id));
+
+  // If enough unseen, use them
+  if (unseen.length >= count) {
+    return unseen.slice(0, count);
+  }
+
+  // Otherwise, use all unseen + generate new ones
+  const newSentences = unseen;
+  const toGenerate = count - newSentences.length;
+
+  if (toGenerate > 0) {
+    let topicName = customTopic ?? "";
+    if (!topicName && topicId) {
+      const { data: topicData } = await supabase
+        .from("topics")
+        .select("name_ru, name_en, name_es")
+        .eq("id", topicId)
+        .single();
+
+      if (topicData) {
+        topicName =
+          interfaceLanguage === "ru"
+            ? topicData.name_ru
+            : interfaceLanguage === "es"
+              ? topicData.name_es
+              : topicData.name_en;
+      }
+    }
+
+    const generated = await generateSentences({
+      language,
+      level,
+      topicName,
+      interfaceLanguage,
+      count: toGenerate,
+    });
+
+    // Save generated to sentences table
+    for (const s of generated) {
+      const { data: sentenceRow } = await supabaseAdmin
+        .from("sentences")
+        .insert({
+          language,
+          level,
+          topic_id: topicId ?? null,
+          custom_topic: customTopic ?? null,
+          sentence_text: s.sentence_text,
+          translation_ru: s.translation_ru,
+          translation_en: s.translation_en ?? null,
+          visual_svg: s.visual_svg ?? null,
+          ai_model: "gemini",
+          times_shown: 0,
+        })
+        .select()
+        .single();
+
+      if (sentenceRow && s.parts.length > 0) {
+        await supabaseAdmin.from("sentence_parts").insert(
+          s.parts.map((part: any, index: number) => ({
+            sentence_id: sentenceRow.id,
+            order_index: index,
+            text: part.text,
+            translation_ru: part.translation_ru,
+            translation_en: part.translation_en ?? null,
+            pronunciation: part.pronunciation,
+            explanation: part.explanation ?? null,
+            tip: part.tip ?? null,
+          }))
+        );
+
+        // Fetch full sentence with parts
+        const { data: full } = await supabaseAdmin
+          .from("sentences")
+          .select("*, sentence_parts(*)")
+          .eq("id", sentenceRow.id)
+          .single();
+
+        if (full) newSentences.push(full);
+      }
+    }
+  }
+
+  return newSentences;
+}
+
+// ─────────────────────────────────────────
+// Gemini generation
+// ─────────────────────────────────────────
 async function generateSentences({
   language,
   level,
@@ -355,7 +432,6 @@ Return ONLY valid JSON array, no markdown, no extra text:
     const result = await model.generateContent(prompt);
     const text = result.response.text();
 
-    // Чистим возможные markdown-обёртки
     const clean = text
       .replace(/```json\n?/g, "")
       .replace(/```\n?/g, "")

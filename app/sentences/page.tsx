@@ -36,10 +36,13 @@ export default function SentencesPage() {
     isLoading,
     isGenerating,
     error,
+    weeklyCount,
+    weeklyLimit,
     markPartUnderstood,
     markAllUnderstood,
     nextSentence,
     addMoreSentences,
+    refreshSentences,
     refetch,
   } = useSentences({
     language,
@@ -88,12 +91,14 @@ export default function SentencesPage() {
       level={level}
       language={language}
       isGenerating={isGenerating}
+      weeklyCount={weeklyCount}
+      weeklyLimit={weeklyLimit}
       onStartTrain={() => {
         setTrainIndex(0)
         setMode('train')
       }}
       onAddMore={addMoreSentences}
-      onRefresh={refetch}
+      onRefresh={refreshSentences}
     />
   )
 }
@@ -157,6 +162,8 @@ function ListView({
   level,
   language,
   isGenerating,
+  weeklyCount,
+  weeklyLimit,
   onStartTrain,
   onAddMore,
   onRefresh,
@@ -167,12 +174,15 @@ function ListView({
   level: Level
   language: string
   isGenerating: boolean
+  weeklyCount: number
+  weeklyLimit: number
   onStartTrain: () => void
   onAddMore: () => void
   onRefresh: () => void
 }) {
   const ui = UI[lang] ?? UI.ru
   const MAX_SENTENCES = 10
+  const canAddMore = weeklyCount < weeklyLimit
 
   return (
     <div className="mx-auto max-w-lg space-y-4 px-4 py-6">
@@ -195,7 +205,7 @@ function ListView({
             <RefreshCw className={cn('h-4 w-4', isGenerating && 'animate-spin')} />
           </button>
           <div className="text-sm font-medium text-muted-foreground">
-            {sentences.length} {ui.progress === 'Прогресс' ? 'предл.' : ui.progress === 'Progress' ? 'sent.' : 'or.'}
+            {sentences.length}/{weeklyLimit}
           </div>
         </div>
       </div>
@@ -271,8 +281,8 @@ function ListView({
         })}
       </div>
 
-      {/* Add more */}
-      {sentences.length < MAX_SENTENCES && (
+      {/* Add more / Limit reached */}
+      {canAddMore ? (
         <button
           onClick={onAddMore}
           disabled={isGenerating}
@@ -287,6 +297,10 @@ function ListView({
             ui.addMore
           )}
         </button>
+      ) : (
+        <div className="w-full rounded-2xl border border-dashed border-amber-500/30 bg-amber-500/5 py-3 px-4 text-sm text-amber-700 dark:text-amber-400 text-center">
+          {lang === 'ru' ? 'Лимит достигнут. Нажмите обновить для новых предложений' : lang === 'es' ? 'Límite alcanzado. Haz clic en actualizar para nuevas oraciones' : 'Limit reached. Click refresh for new sentences'}
+        </div>
       )}
 
       {/* Train button */}

@@ -102,6 +102,9 @@ export interface UserSentence {
   fully_mastered: boolean
   first_seen_at: string
   updated_at: string
+  is_active: boolean
+  week_number: number
+  year: number
 }
 
 export interface UserWeakPart {

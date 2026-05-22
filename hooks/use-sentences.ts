@@ -14,6 +14,8 @@ interface UseSentencesReturn {
   currentSentence: SentenceWithParts | null
   currentIndex: number
   userProgress: Record<string, UserSentence>
+  weeklyCount: number
+  weeklyLimit: number
 
   // State
   isLoading: boolean
@@ -25,6 +27,7 @@ interface UseSentencesReturn {
   markAllUnderstood: (sentenceId: string) => Promise<void>
   nextSentence: () => void
   addMoreSentences: () => Promise<void>
+  refreshSentences: () => Promise<void>
   refetch: () => Promise<void>
 }
 
@@ -53,6 +56,8 @@ export function useSentences({
   const [isLoading, setIsLoading] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [weeklyCount, setWeeklyCount] = useState(0)
+  const [weeklyLimit] = useState(10)
 
   const fetchSentences = useCallback(async () => {
     if (!enabled) return
@@ -61,8 +66,6 @@ export function useSentences({
       setIsLoading(true)
       setError(null)
 
-      // Запрашиваем предложения через API route
-      // (там логика: БД → если нет → Gemini → сохранить → вернуть)
       setIsGenerating(true)
       const res = await fetch('/api/sentences', {
         method: 'POST',
@@ -81,17 +84,20 @@ export function useSentences({
       if (!res.ok) {
         let errorMsg = 'Failed to fetch sentences'
         try {
-          const errData = await res.json() as { error?: string; details?: string }
+          const errData = await res.json() as { error?: string }
           if (errData && errData.error) {
-            errorMsg = errData.details ? `${errData.error}: ${errData.details}` : errData.error
+            errorMsg = errData.error
           }
         } catch {}
         throw new Error(errorMsg)
       }
 
-      const data = await res.json() as { sentences: SentenceWithParts[] }
+      const data = await res.json() as { 
+        sentences: SentenceWithParts[]
+        weeklyLimit?: { total: number; max: number }
+      }
 
-      // Сортируем части по order_index
+      // Sort parts by order_index
       const sorted = data.sentences.map(s => ({
         ...s,
         sentence_parts: [...(s.sentence_parts ?? [])].sort(
@@ -101,8 +107,12 @@ export function useSentences({
 
       setSentences(sorted)
       setCurrentIndex(0)
+      
+      if (data.weeklyLimit) {
+        setWeeklyCount(data.weeklyLimit.total)
+      }
 
-      // Загружаем прогресс пользователя по этим предложениям
+      // Load user progress for these sentences
       if (sorted.length > 0) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
@@ -127,7 +137,7 @@ export function useSentences({
     } finally {
       setIsLoading(false)
     }
-  }, [language, level, topicId, customTopic, interfaceLanguage, enabled])
+  }, [language, level, topicId, customTopic, interfaceLanguage, enabled, supabase])
 
   useEffect(() => {
     fetchSentences()
@@ -163,6 +173,9 @@ export function useSentences({
         all_understood: allUnderstood,
         times_shown: (current?.times_shown ?? 0) + (current ? 0 : 1),
         last_shown_at: new Date().toISOString(),
+        is_active: current?.is_active ?? true,
+        week_number: current?.week_number ?? 0,
+        year: current?.year ?? new Date().getFullYear(),
       }, { onConflict: 'user_id,sentence_id' })
       .select()
       .single()
@@ -199,6 +212,9 @@ export function useSentences({
         all_understood: allUnderstood,
         times_shown: (current?.times_shown ?? 0) + (current ? 0 : 1),
         last_shown_at: new Date().toISOString(),
+        is_active: current?.is_active ?? true,
+        week_number: current?.week_number ?? 0,
+        year: current?.year ?? new Date().getFullYear(),
       }, { onConflict: 'user_id,sentence_id' })
       .select()
       .single()
@@ -208,19 +224,16 @@ export function useSentences({
     }
   }
 
-  // Следующее предложение
+  // Next sentence in training mode
   const nextSentence = () => {
     if (currentIndex < sentences.length - 1) {
       setCurrentIndex(prev => prev + 1)
-    } else {
-      // Все предложения просмотрены — подгружаем новые
-      fetchSentences()
     }
   }
 
-  // Добавить ещё предложения (без замены текущих)
+  // Add more sentences to the current week (up to limit)
   const addMoreSentences = async () => {
-    if (!enabled) return
+    if (!enabled || weeklyCount >= weeklyLimit) return
 
     try {
       setIsGenerating(true)
@@ -235,24 +248,25 @@ export function useSentences({
           topic_id: topicId,
           custom_topic: customTopic,
           interface_language: interfaceLanguage,
-          get_new: true, // Параметр, чтобы получить новые предложения
         }),
       })
 
       if (!res.ok) {
         let errorMsg = 'Failed to fetch more sentences'
         try {
-          const errData = await res.json() as { error?: string; details?: string }
+          const errData = await res.json() as { error?: string }
           if (errData && errData.error) {
-            errorMsg = errData.details ? `${errData.error}: ${errData.details}` : errData.error
+            errorMsg = errData.error
           }
         } catch {}
         throw new Error(errorMsg)
       }
 
-      const data = await res.json() as { sentences: SentenceWithParts[] }
+      const data = await res.json() as { 
+        sentences: SentenceWithParts[]
+        weeklyLimit?: { total: number; max: number }
+      }
 
-      // Сортируем части по order_index
       const sorted = data.sentences.map(s => ({
         ...s,
         sentence_parts: [...(s.sentence_parts ?? [])].sort(
@@ -260,10 +274,14 @@ export function useSentences({
         ),
       }))
 
-      // Добавляем новые предложения к существующим
+      // Add new sentences to existing
       setSentences(prev => [...prev, ...sorted])
 
-      // Загружаем прогресс пользователя по новым предложениям
+      if (data.weeklyLimit) {
+        setWeeklyCount(data.weeklyLimit.total)
+      }
+
+      // Load progress for new sentences
       if (sorted.length > 0) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
@@ -289,11 +307,91 @@ export function useSentences({
     }
   }
 
+  // Refresh: deactivate current, get 5 new ones
+  const refreshSentences = async () => {
+    if (!enabled) return
+
+    try {
+      setIsGenerating(true)
+      setError(null)
+
+      const res = await fetch('/api/sentences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language,
+          level,
+          topic_id: topicId,
+          custom_topic: customTopic,
+          interface_language: interfaceLanguage,
+          refresh: true,
+        }),
+      })
+
+      if (!res.ok) {
+        let errorMsg = 'Failed to refresh sentences'
+        try {
+          const errData = await res.json() as { error?: string }
+          if (errData && errData.error) {
+            errorMsg = errData.error
+          }
+        } catch {}
+        throw new Error(errorMsg)
+      }
+
+      const data = await res.json() as { 
+        sentences: SentenceWithParts[]
+        weeklyLimit?: { total: number; max: number }
+      }
+
+      const sorted = data.sentences.map(s => ({
+        ...s,
+        sentence_parts: [...(s.sentence_parts ?? [])].sort(
+          (a, b) => a.order_index - b.order_index
+        ),
+      }))
+
+      // Replace with new sentences
+      setSentences(sorted)
+      setCurrentIndex(0)
+
+      if (data.weeklyLimit) {
+        setWeeklyCount(data.weeklyLimit.total)
+      }
+
+      // Load progress
+      if (sorted.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const ids = sorted.map(s => s.id)
+        const { data: progressData } = await supabase
+          .from('user_sentences')
+          .select('*')
+          .eq('user_id', user.id)
+          .in('sentence_id', ids)
+
+        const progressMap: Record<string, UserSentence> = {}
+        for (const p of progressData ?? []) {
+          progressMap[p.sentence_id] = p
+        }
+        setUserProgress(progressMap)
+      }
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   return {
     sentences,
     currentSentence: sentences[currentIndex] ?? null,
     currentIndex,
     userProgress,
+    weeklyCount,
+    weeklyLimit,
     isLoading,
     isGenerating,
     error,
@@ -301,6 +399,7 @@ export function useSentences({
     markAllUnderstood,
     nextSentence,
     addMoreSentences,
+    refreshSentences,
     refetch: fetchSentences,
   }
 }
