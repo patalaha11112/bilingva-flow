@@ -71,6 +71,7 @@ export interface Sentence {
   sentence_text: string
   translation_ru: string
   translation_en: string | null
+  visual_svg: string | null
   ai_model: AIModel
   times_shown: number
   created_at: string
@@ -327,6 +328,7 @@ export interface GeneratedSentence {
   sentence_text: string
   translation_ru: string
   translation_en?: string
+  visual_svg?: string
   parts: GeneratedSentencePart[]
 }
 

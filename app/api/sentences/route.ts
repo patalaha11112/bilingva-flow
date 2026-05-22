@@ -183,6 +183,7 @@ export async function POST(request: NextRequest) {
               sentence_text: s.sentence_text,
               translation_ru: s.translation_ru,
               translation_en: s.translation_en ?? null,
+              visual_svg: s.visual_svg ?? null,
               ai_model: "gemini",
             })
             .select()
@@ -320,12 +321,22 @@ Rules:
 - Explanations and translations must be in ${uiLang}
 - Be encouraging and positive in explanations
 - Vary sentence structures
+- For each sentence, generate a minimal SVG illustration representing the key noun or action
+
+SVG Rules:
+- viewBox="0 0 100 100", no width/height attributes
+- Maximum 2 simple shapes (circle, rect, path)
+- Single color fill using currentColor so it inherits from CSS
+- No text, no gradients, no complex paths
+- Rounded, friendly style — use rx on rects, smooth curves
+- Return as "visual_svg" string (complete SVG markup)
 
 Return ONLY valid JSON array, no markdown, no extra text:
 [
   {
     "sentence_text": "full sentence in ${langName}",
     "translation_ru": "translation in ${uiLang}",
+    "visual_svg": "<svg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'><path d='...' fill='currentColor'/></svg>",
     "parts": [
       {
         "text": "part of sentence",
