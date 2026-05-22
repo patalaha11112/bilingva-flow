@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
     // 4. Сохраняем в Supabase
     // ─────────────────────────────────────────
     const saved = [];
+    let lastDbError = null;
 
     for (const s of generated) {
       // Сохраняем предложение
@@ -125,11 +126,15 @@ export async function POST(request: NextRequest) {
         .select()
         .single();
 
-      if (sentenceErr || !sentenceRow) continue;
+      if (sentenceErr || !sentenceRow) {
+        console.error("Supabase sentence insert error:", sentenceErr);
+        lastDbError = sentenceErr;
+        continue;
+      }
 
       // Сохраняем части
       if (s.parts.length > 0) {
-        await supabase.from("sentence_parts").insert(
+        const { error: partsErr } = await supabase.from("sentence_parts").insert(
           s.parts.map((part, index) => ({
             sentence_id: sentenceRow.id,
             order_index: index,
@@ -141,16 +146,33 @@ export async function POST(request: NextRequest) {
             tip: part.tip ?? null,
           })),
         );
+        if (partsErr) {
+          console.error("Supabase sentence parts insert error:", partsErr);
+          lastDbError = partsErr;
+        }
       }
 
       // Подгружаем с частями
-      const { data: full } = await supabase
+      const { data: full, error: fetchErr } = await supabase
         .from("sentences")
         .select("*, sentence_parts(*)")
         .eq("id", sentenceRow.id)
         .single();
 
+      if (fetchErr) {
+        console.error("Supabase fetch full sentence error:", fetchErr);
+        lastDbError = fetchErr;
+      }
+
       if (full) saved.push(full);
+    }
+
+    if (generated.length > 0 && saved.length === 0) {
+      return NextResponse.json({
+        error: "Failed to save generated sentences to database",
+        details: lastDbError ? lastDbError.message : "Unknown database error",
+        rawError: lastDbError
+      }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -160,7 +182,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Sentences generate error:", error);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : "Internal error",
+      details: error
+    }, { status: 500 });
   }
 }
 

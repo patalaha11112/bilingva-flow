@@ -78,7 +78,14 @@ export function useSentences({
       setIsGenerating(false)
 
       if (!res.ok) {
-        throw new Error('Failed to fetch sentences')
+        let errorMsg = 'Failed to fetch sentences'
+        try {
+          const errData = await res.json() as { error?: string; details?: string }
+          if (errData && errData.error) {
+            errorMsg = errData.details ? `${errData.error}: ${errData.details}` : errData.error
+          }
+        } catch {}
+        throw new Error(errorMsg)
       }
 
       const data = await res.json() as { sentences: SentenceWithParts[] }

@@ -34,9 +34,11 @@ export default function SentencesPage() {
     userProgress,
     isLoading,
     isGenerating,
+    error,
     markPartUnderstood,
     markAllUnderstood,
     nextSentence,
+    refetch,
   } = useSentences({
     language,
     level,
@@ -45,6 +47,8 @@ export default function SentencesPage() {
   })
 
   if (userLoading || isLoading) return <SentencesSkeleton />
+
+  if (error) return <ErrorState message={error} onRetry={refetch} lang={lang} />
 
   if (isGenerating) return <GeneratingState lang={lang} level={level} />
 
@@ -584,6 +588,30 @@ function SentencesSkeleton() {
         ))}
       </div>
       <Skeleton className="h-12 rounded-2xl" />
+    </div>
+  )
+}
+
+function ErrorState({
+  message,
+  onRetry,
+  lang,
+}: {
+  message: string
+  onRetry: () => void
+  lang: string
+}) {
+  return (
+    <div className="mx-auto max-w-lg px-4 py-20 text-center space-y-4">
+      <div className="rounded-2xl bg-destructive/10 p-4 border border-destructive/20 text-destructive text-sm text-left whitespace-pre-wrap break-all">
+        <p className="font-semibold mb-1">
+          {lang === 'ru' ? '⚠️ Ошибка:' : lang === 'es' ? '⚠️ Error:' : '⚠️ Error:'}
+        </p>
+        {message}
+      </div>
+      <Button onClick={onRetry} className="w-full h-11 text-sm font-medium">
+        {lang === 'ru' ? 'Попробовать снова' : lang === 'es' ? 'Reintentar' : 'Try Again'}
+      </Button>
     </div>
   )
 }
