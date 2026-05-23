@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Volume2, Square } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
 import { getAlphabetData, type Letter, type Digraph } from '@/core/alphabet-data'
 import { cn } from '@/lib/utils'
 import type { LearningLang, InterfaceLang } from '@/types/database'
 
-// Маппинг из новых типов БД в старый формат alphabet-data
 function toLegacyLang(lang: LearningLang): 'spanish' | 'english' {
   return lang === 'es' ? 'spanish' : 'english'
 }
@@ -106,179 +106,237 @@ export default function AlphabetPage() {
     'isSpecial' in item && !!item.isSpecial
 
   return (
-    <div className="flex min-h-[calc(100vh-120px)] flex-col bg-[#0e0c09] text-[#f0e6d3] font-serif">
-      {/* Header */}
-      <header className="border-b border-[#2a2520] bg-gradient-to-b from-[#1a1510] to-[#0e0c09] px-6 py-8 text-center">
-        <div className="mb-3 text-3xl tracking-widest">{alphabetData.flag}</div>
-        <h1 className="text-3xl font-black tracking-tight md:text-4xl">
+    <div className="mx-auto max-w-lg px-4 py-6 space-y-5">
+
+      {/* ── Header ── */}
+      <div className="text-center space-y-1.5">
+        <div className="text-2xl leading-none">{alphabetData.flag}</div>
+        <h1 className="text-2xl font-bold tracking-tight">
           {alphabetData.title[interfaceLang]}
         </h1>
-        <p className="mt-2 text-sm italic text-[#7a6e62]">
+        <p className="text-sm text-muted-foreground">
           {uiText.subtitle[interfaceLang]}
         </p>
-      </header>
+      </div>
 
-      {/* Main */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[1fr_1.4fr]">
-        {/* Left — Letters */}
-        <div className="overflow-y-auto border-r border-[#2a2520] px-5 py-6">
-          <div className="mb-4 text-xs uppercase tracking-widest text-[#5a5048]">
-            {alphabetData.subtitle[interfaceLang]}
-          </div>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(60px,1fr))] gap-2">
-            {alphabetData.letters.map((l) => (
-              <button
-                key={l.letter}
-                onClick={() => fetchExplanation(l)}
-                className={cn(
-                  'flex aspect-square flex-col items-center justify-center gap-0.5 rounded border transition-all cursor-pointer',
-                  'bg-[#141210] hover:bg-[#1e1a14] hover:-translate-y-0.5',
-                  l.isSpecial
-                    ? 'border-[#3d2e1c] text-[#c9813a]'
-                    : 'border-[#2a2520] text-[#c4b8aa]',
-                  selected?.letter === l.letter && 'border-[#c9813a] bg-[#1e1a14] shadow-lg shadow-[#c9813a]/10'
-                )}
-              >
-                <span className="text-xl font-bold leading-none">{l.letter}</span>
-                <span className="text-[0.55rem] font-light lowercase tracking-wide text-[#5a5048]">
-                  {l.name}
-                </span>
-              </button>
-            ))}
-          </div>
+      {/* ── Letter grid ── */}
+      <div className="rounded-2xl bg-card shadow-sm p-4 space-y-4">
 
-          {/* Digraphs */}
-          <div className="mt-6 text-xs uppercase tracking-widest text-[#5a5048]">
-            {uiText.digraphs[interfaceLang]}
-          </div>
-          <div className="mt-1 mb-3 text-[0.7rem] italic text-[#5a5048]/70">
-            {alphabetData.digraphNote[interfaceLang]}
-          </div>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(70px,1fr))] gap-2">
-            {alphabetData.digraphs.map((d) => (
-              <button
-                key={d.letter}
-                onClick={() => fetchExplanation(d)}
-                className={cn(
-                  'flex aspect-square flex-col items-center justify-center gap-0.5 rounded border transition-all cursor-pointer',
-                  'border-[#3d2e1c] bg-[#141210] text-[#c9813a]',
-                  'hover:bg-[#1e1a14] hover:-translate-y-0.5',
-                  selected?.letter === d.letter && 'border-[#c9813a] bg-[#1e1a14] shadow-lg shadow-[#c9813a]/10'
-                )}
-              >
-                <span className="text-lg font-bold leading-none">{d.letter}</span>
-                <span className="text-[0.55rem] font-light lowercase tracking-wide text-[#5a5048]">
-                  {d.name}
-                </span>
-              </button>
-            ))}
-          </div>
+        {/* Alphabet section label */}
+        <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground/50">
+          {alphabetData.subtitle[interfaceLang]}
+        </p>
+
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(50px,1fr))] gap-1.5">
+          {alphabetData.letters.map((l) => (
+            <LetterButton
+              key={l.letter}
+              letter={l.letter}
+              name={l.name}
+              isSpecial={!!l.isSpecial}
+              isSelected={selected?.letter === l.letter}
+              onClick={() => fetchExplanation(l)}
+            />
+          ))}
         </div>
 
-        {/* Right — Explanation */}
-        <div className="flex flex-col overflow-y-auto bg-[#0e0c09] px-6 py-8 md:px-8">
-          {!selected ? (
-            <div className="m-auto text-center text-[#3a342e]">
-              <div className="text-7xl font-black leading-none opacity-30">Aa</div>
-              <p className="mt-3 text-sm italic">{uiText.selectHint[interfaceLang]}</p>
-            </div>
-          ) : (
-            <>
-              {/* Letter header */}
-              <div className="mb-6 flex items-baseline gap-4 border-b border-[#2a2520] pb-5">
-                <div className="text-6xl font-black leading-none text-[#c9813a]">
-                  {selected.letter}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <div className="text-xl font-semibold">{selected.name}</div>
-                  <div className="text-sm italic text-[#7a6e62]">
-                    ≈ «{selected.sound[interfaceLang]}»
-                  </div>
-                  {isSpecial(selected) && (
-                    <span className="mt-1 inline-block w-fit rounded border border-[#3d2e1c] bg-[#2a1e0e] px-2 py-0.5 text-[0.65rem] uppercase tracking-widest text-[#c9813a]">
-                      {uiText.hasQuirks[interfaceLang]}
-                    </span>
-                  )}
-                  {/* Audio buttons */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => speak(selected.letter)}
-                      className={cn(
-                        'rounded border border-[#3d2e1c] bg-[#1e1a14] px-3 py-1.5 text-xs text-[#c9813a] transition-all cursor-pointer',
-                        'hover:border-[#c9813a] hover:bg-[#2a1e0e]',
-                        speaking && 'border-[#c9813a] shadow-md shadow-[#c9813a]/20'
-                      )}
-                    >
-                      {speaking ? '🔊' : '🔈'} {uiText.playLetter[interfaceLang]}
-                    </button>
-                    <button
-                      onClick={() => speak(selected.name)}
-                      className={cn(
-                        'rounded border border-[#3d2e1c] bg-[#1e1a14] px-3 py-1.5 text-xs text-[#c9813a] transition-all cursor-pointer',
-                        'hover:border-[#c9813a] hover:bg-[#2a1e0e]',
-                        speaking && 'border-[#c9813a] shadow-md shadow-[#c9813a]/20'
-                      )}
-                    >
-                      {speaking ? '🔊' : '🔈'} {uiText.playName[interfaceLang]}
-                    </button>
-                    <button
-                      onClick={stopSpeaking}
-                      className="rounded border border-[#2a2520] bg-[#1e1a14] px-3 py-1.5 text-xs text-[#7a6e62] transition-all cursor-pointer hover:border-[#5a5048] hover:text-[#f0e6d3]"
-                    >
-                      ■ {uiText.stop[interfaceLang]}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Explanation label */}
-              <div className="mb-4 flex items-center gap-2 text-xs uppercase tracking-widest text-[#3a342e]">
-                <span>{uiText.explanationBy[interfaceLang]}</span>
-                {isCached && (
-                  <span className="rounded bg-[#1e1a14] border border-[#2a2520] px-1.5 py-0.5 text-[#5a5048] normal-case tracking-normal">
-                    {uiText.cached[interfaceLang]}
-                  </span>
-                )}
-              </div>
-
-              {/* Loading */}
-              {loading && (
-                <div className="flex gap-2 py-4">
-                  {[0, 200, 400].map(delay => (
-                    <span
-                      key={delay}
-                      className="h-2 w-2 animate-pulse rounded-full bg-[#c9813a]"
-                      style={{ animationDelay: `${delay}ms` }}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Error */}
-              {error && <p className="text-sm italic text-red-400">{error}</p>}
-
-              {/* Content */}
-              {explanation && !loading && (
-                <div className="text-[0.95rem] leading-relaxed text-[#c4b8aa]">
-                  {renderExplanation(explanation)}
-                </div>
-              )}
-            </>
-          )}
+        {/* Digraphs section */}
+        <div className="space-y-3 pt-1 border-t border-border/60">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground/50">
+              {uiText.digraphs[interfaceLang]}
+            </p>
+            <p className="text-[0.65rem] italic text-muted-foreground/40">
+              {alphabetData.digraphNote[interfaceLang]}
+            </p>
+          </div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-1.5">
+            {alphabetData.digraphs.map((d) => (
+              <LetterButton
+                key={d.letter}
+                letter={d.letter}
+                name={d.name}
+                isSpecial
+                isSelected={selected?.letter === d.letter}
+                onClick={() => fetchExplanation(d)}
+              />
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* ── Explanation panel ── */}
+      <div className="rounded-2xl bg-card shadow-sm">
+        {!selected ? (
+          /* Empty placeholder */
+          <div className="flex flex-col items-center justify-center py-14 text-center px-6">
+            <span
+              className="text-[72px] font-black leading-none select-none"
+              style={{ color: 'color-mix(in oklch, var(--color-foreground) 8%, transparent)' }}
+            >
+              Aa
+            </span>
+            <p className="mt-3 text-sm text-muted-foreground">
+              {uiText.selectHint[interfaceLang]}
+            </p>
+          </div>
+        ) : (
+          <div className="p-5 space-y-4">
+
+            {/* Letter header row */}
+            <div className="flex items-start gap-4 pb-4 border-b border-border/70">
+
+              {/* Big letter */}
+              <span className="text-5xl font-black leading-none text-primary shrink-0 pt-0.5">
+                {selected.letter}
+              </span>
+
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <p className="text-[17px] font-semibold leading-snug">{selected.name}</p>
+                <p className="text-sm text-muted-foreground italic">
+                  ≈ «{selected.sound[interfaceLang]}»
+                </p>
+
+                {/* Special badge */}
+                {isSpecial(selected) && (
+                  <span className="inline-block rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[0.58rem] font-semibold uppercase tracking-widest text-primary">
+                    {uiText.hasQuirks[interfaceLang]}
+                  </span>
+                )}
+
+                {/* Audio buttons */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <button
+                    onClick={() => speak(selected.letter)}
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-xs font-medium text-primary transition-all cursor-pointer',
+                      'hover:border-primary/40 hover:bg-primary/10',
+                      speaking && 'border-primary/50 bg-primary/10'
+                    )}
+                  >
+                    <Volume2 className="h-3 w-3" />
+                    {uiText.playLetter[interfaceLang]}
+                  </button>
+                  <button
+                    onClick={() => speak(selected.name)}
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-xs font-medium text-primary transition-all cursor-pointer',
+                      'hover:border-primary/40 hover:bg-primary/10',
+                      speaking && 'border-primary/50 bg-primary/10'
+                    )}
+                  >
+                    <Volume2 className="h-3 w-3" />
+                    {uiText.playName[interfaceLang]}
+                  </button>
+                  <button
+                    onClick={stopSpeaking}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-all cursor-pointer hover:text-foreground hover:border-border/80"
+                  >
+                    <Square className="h-3 w-3" />
+                    {uiText.stop[interfaceLang]}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Explanation label */}
+            <div className="flex items-center gap-2">
+              <p className="text-[0.62rem] font-semibold uppercase tracking-widest text-muted-foreground/45">
+                {uiText.explanationBy[interfaceLang]}
+              </p>
+              {isCached && (
+                <span className="rounded border border-border/60 bg-muted/60 px-1.5 py-0.5 text-[0.58rem] text-muted-foreground/60">
+                  {uiText.cached[interfaceLang]}
+                </span>
+              )}
+            </div>
+
+            {/* Loading dots */}
+            {loading && (
+              <div className="flex items-center gap-1.5 py-1">
+                {[0, 160, 320].map(delay => (
+                  <span
+                    key={delay}
+                    className="h-2 w-2 animate-pulse rounded-full bg-primary"
+                    style={{ animationDelay: `${delay}ms` }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Error */}
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+
+            {/* Explanation content */}
+            {explanation && !loading && (
+              <div className="text-[0.9rem] leading-relaxed text-foreground/75">
+                {renderExplanation(explanation)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
     </div>
   )
 }
 
 // ─────────────────────────────────────────────
-// UI strings (вместо хардкода по всему файлу)
+// Letter / Digraph button
 // ─────────────────────────────────────────────
+
+function LetterButton({
+  letter,
+  name,
+  isSpecial,
+  isSelected,
+  onClick,
+}: {
+  letter: string
+  name: string
+  isSpecial: boolean
+  isSelected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl border transition-all duration-150 cursor-pointer select-none',
+        isSpecial
+          ? [
+              'border-primary/20 text-primary',
+              'hover:border-primary/40 hover:bg-primary/10',
+            ]
+          : [
+              'border-border text-foreground/80',
+              'hover:border-border/60 hover:bg-accent',
+            ],
+        isSelected && [
+          '!border-primary !bg-primary/10',
+          'shadow-sm shadow-primary/20',
+        ]
+      )}
+    >
+      <span className="text-base font-semibold leading-none">{letter}</span>
+      <span className="text-[0.58rem] font-medium lowercase tracking-wide text-muted-foreground/60 mt-0.5">
+        {name}
+      </span>
+    </button>
+  )
+}
+
+// ─────────────────────────────────────────────
+// UI strings
+// ─────────────────────────────────────────────
+
 const uiText: Record<string, Record<InterfaceLang, string>> = {
   subtitle: {
     ru: 'Нажми на букву — Claude объяснит как читается',
-    en: 'Click a letter — Claude will explain pronunciation',
-    es: 'Haz clic en una letra — Claude explicará la pronunciación',
+    en: 'Tap a letter — Claude will explain its pronunciation',
+    es: 'Toca una letra — Claude explicará su pronunciación',
   },
   digraphs: {
     ru: 'Диграфы',
@@ -286,9 +344,9 @@ const uiText: Record<string, Record<InterfaceLang, string>> = {
     es: 'Dígrafos',
   },
   selectHint: {
-    ru: 'Выбери любую букву слева',
-    en: 'Select any letter on the left',
-    es: 'Selecciona cualquier letra',
+    ru: 'Выбери букву чтобы увидеть объяснение',
+    en: 'Select a letter to see the explanation',
+    es: 'Selecciona una letra para ver la explicación',
   },
   hasQuirks: {
     ru: 'с особенностями',
