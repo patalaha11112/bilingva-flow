@@ -33,6 +33,7 @@ export default function PracticePage() {
   const [content, setContent] = useState('')
   const [isBonus, setIsBonus] = useState(false)
   const [feedbackData, setFeedbackData] = useState<FeedbackData | null>(null)
+  const [submitError, setSubmitError] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0
@@ -64,6 +65,7 @@ export default function PracticePage() {
 
   const handleSubmit = async () => {
     if (!content.trim()) return
+    setSubmitError('')
     setPhase('analyzing')
 
     try {
@@ -80,11 +82,15 @@ export default function PracticePage() {
         }),
       })
 
-      if (!res.ok) throw new Error('Failed')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string }
+        throw new Error(err.error ?? 'Server error')
+      }
       const data = await res.json() as { score: number; feedback: string; word_count: number }
       setFeedbackData({ score: data.score, feedback: data.feedback, word_count: data.word_count })
       setPhase('feedback')
-    } catch {
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Error')
       setPhase('writing')
     }
   }
@@ -238,6 +244,9 @@ export default function PracticePage() {
             {t('essaySubmit', lang)}
           </button>
         </div>
+        {submitError && (
+          <p className="text-xs text-destructive">{submitError}</p>
+        )}
       </section>
 
     </div>
