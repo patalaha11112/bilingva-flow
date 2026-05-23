@@ -26,6 +26,11 @@ export type TranslationKey =
   | 'interests' | 'sentencesPerWeek'
   | 'spanish' | 'english'
   | 'theme' | 'themeLight' | 'themeDark' | 'logout'
+  // Practice / Essay
+  | 'essayTitle' | 'essayBonusLabel' | 'essayTopic' | 'essaySuggestedWords'
+  | 'essayPlaceholder' | 'essayWordCountSuffix' | 'essaySubmit' | 'essayAnalyzing'
+  | 'essayGreatWork' | 'essayFeedbackLabel' | 'essayScoreLabel' | 'essayWriteAnother'
+  | 'essayMinHint'
 
 const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
   ru: {
@@ -77,6 +82,19 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     themeLight: 'Светлая',
     themeDark: 'Тёмная',
     logout: 'Выйти из аккаунта',
+    essayTitle: 'Эссе',
+    essayBonusLabel: 'Бонус',
+    essayTopic: 'Тема',
+    essaySuggestedWords: 'Попробуй использовать эти слова',
+    essayPlaceholder: 'Пишите здесь на изучаемом языке...',
+    essayWordCountSuffix: 'сл.',
+    essaySubmit: 'Отправить',
+    essayAnalyzing: 'Анализирую...',
+    essayGreatWork: 'Отличная работа!',
+    essayFeedbackLabel: 'Анализ',
+    essayScoreLabel: 'Оценка',
+    essayWriteAnother: 'Написать ещё одно',
+    essayMinHint: 'Минимум 1 предложение',
   },
   en: {
     home: 'Home',
@@ -127,6 +145,19 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     themeLight: 'Light',
     themeDark: 'Dark',
     logout: 'Log out',
+    essayTitle: 'Essay',
+    essayBonusLabel: 'Bonus',
+    essayTopic: 'Topic',
+    essaySuggestedWords: 'Try to use these words',
+    essayPlaceholder: 'Write here in the language you are learning...',
+    essayWordCountSuffix: 'w',
+    essaySubmit: 'Submit',
+    essayAnalyzing: 'Analyzing...',
+    essayGreatWork: 'Great work!',
+    essayFeedbackLabel: 'Feedback',
+    essayScoreLabel: 'Score',
+    essayWriteAnother: 'Write another one',
+    essayMinHint: 'Minimum 1 sentence',
   },
   es: {
     home: 'Inicio',
@@ -177,6 +208,19 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     themeLight: 'Claro',
     themeDark: 'Oscuro',
     logout: 'Cerrar sesión',
+    essayTitle: 'Ensayo',
+    essayBonusLabel: 'Bono',
+    essayTopic: 'Tema',
+    essaySuggestedWords: 'Intenta usar estas palabras',
+    essayPlaceholder: 'Escribe aquí en el idioma que estás aprendiendo...',
+    essayWordCountSuffix: 'pal.',
+    essaySubmit: 'Enviar',
+    essayAnalyzing: 'Analizando...',
+    essayGreatWork: '¡Excelente trabajo!',
+    essayFeedbackLabel: 'Análisis',
+    essayScoreLabel: 'Puntuación',
+    essayWriteAnother: 'Escribir otro',
+    essayMinHint: 'Mínimo 1 oración',
   },
 }
 

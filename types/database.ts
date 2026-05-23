@@ -169,6 +169,7 @@ export interface UserEssay {
   ai_feedback: string | null
   ai_score: number | null
   words_used: string[]
+  is_bonus: boolean
   week_number: number
   year: number
   created_at: string
@@ -430,7 +431,7 @@ export type Database = {
       }
       user_essays: {
         Row: UserEssay
-        Insert: Omit<UserEssay, 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<UserEssay, 'id' | 'created_at' | 'updated_at'> & { is_bonus?: boolean }
         Update: Partial<Omit<UserEssay, 'id' | 'created_at'>>
       }
       user_video_sessions: {
