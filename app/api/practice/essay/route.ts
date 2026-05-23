@@ -107,7 +107,7 @@ Return ONLY a valid JSON object, no markdown, no extra text:
 
     if (essayError) {
       console.error('Essay insert error:', essayError)
-      return NextResponse.json({ error: 'Failed to save essay' }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to save essay', detail: essayError.message, code: essayError.code }, { status: 500 })
     }
 
     // Update daily activity (only for non-bonus essays) — non-fatal
