@@ -25,6 +25,7 @@ export type TranslationKey =
   | 'resetConfirmTitle' | 'resetConfirmMessage'
   | 'interests' | 'sentencesPerWeek'
   | 'spanish' | 'english'
+  | 'theme' | 'themeLight' | 'themeDark' | 'logout'
 
 const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
   ru: {
@@ -72,6 +73,10 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     sentencesPerWeek: 'Предложений в неделю',
     spanish: 'Испанский',
     english: 'Английский',
+    theme: 'Тема',
+    themeLight: 'Светлая',
+    themeDark: 'Тёмная',
+    logout: 'Выйти из аккаунта',
   },
   en: {
     home: 'Home',
@@ -118,6 +123,10 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     sentencesPerWeek: 'Sentences per week',
     spanish: 'Spanish',
     english: 'English',
+    theme: 'Theme',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    logout: 'Log out',
   },
   es: {
     home: 'Inicio',
@@ -164,6 +173,10 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     sentencesPerWeek: 'Oraciones por semana',
     spanish: 'Español',
     english: 'Inglés',
+    theme: 'Tema',
+    themeLight: 'Claro',
+    themeDark: 'Oscuro',
+    logout: 'Cerrar sesión',
   },
 }
 
