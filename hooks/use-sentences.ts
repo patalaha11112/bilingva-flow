@@ -248,6 +248,7 @@ export function useSentences({
           topic_id: topicId,
           custom_topic: customTopic,
           interface_language: interfaceLanguage,
+          add_count: 1,
         }),
       })
 
@@ -324,7 +325,7 @@ export function useSentences({
           topic_id: topicId,
           custom_topic: customTopic,
           interface_language: interfaceLanguage,
-          refresh: true,
+          dev_reset: true,
         }),
       })
 
