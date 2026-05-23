@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
         const { data: sentencesData } = await supabase
           .from("sentences")
           .select(
-            "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, visual_svg, sentence_parts(*)"
+            "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
           )
           .in("id", activeSentenceIds.slice(0, 5));
 
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         const { data } = await supabase
           .from("sentences")
           .select(
-            "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, visual_svg, sentence_parts(*)"
+            "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
           )
           .in("id", activeSentenceIds);
         existingSentences = data ?? [];
@@ -263,7 +263,7 @@ async function getNewSentences(
   let query = supabase
     .from("sentences")
     .select(
-      "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, visual_svg, sentence_parts(*)"
+      "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
     )
     .eq("language", language)
     .eq("level", level);
@@ -324,7 +324,6 @@ async function getNewSentences(
           sentence_text: s.sentence_text,
           translation_ru: s.translation_ru,
           translation_en: s.translation_en ?? null,
-          visual_svg: s.visual_svg ?? null,
           ai_model: "gemini",
           times_shown: 0,
         })
@@ -386,42 +385,57 @@ async function generateSentences({
         : "English";
   const topic = topicName || "general everyday life";
 
-  const prompt = `You are a language teacher creating learning materials.
+  const prompt = `You are an expert language teacher creating structured learning materials.
 
 Generate exactly ${count} ${langName} sentences for a student at level ${level}.
 Topic: "${topic}"
 
-Rules:
-- Sentences must match level ${level} exactly (vocabulary, grammar complexity)
-- Each sentence should be natural, useful in real life
-- Split each sentence into 2-5 meaningful parts (phrases, not single words when possible)
-- For each part provide pronunciation written as it sounds to a ${uiLang} speaker
-- Explanations and translations must be in ${uiLang}
-- Be encouraging and positive in explanations
-- Vary sentence structures
-- For each sentence, generate a minimal SVG illustration representing the key noun or action
+## Sentence Rules
+- Match level ${level} exactly in vocabulary and grammar complexity
+- Sentences must be natural and useful in real life situations
+- Vary sentence structures (statements, questions, negations — mix them)
+- Prefer practical, everyday vocabulary over abstract or literary words
+- Each sentence must cover a different grammar pattern or vocabulary area — no repetition
 
-SVG Rules:
-- viewBox="0 0 100 100", no width/height attributes
-- Maximum 2 simple shapes (circle, rect, path)
-- Single color fill using currentColor so it inherits from CSS
-- No text, no gradients, no complex paths
-- Rounded, friendly style — use rx on rects, smooth curves
-- Return as "visual_svg" string (complete SVG markup)
+## Splitting Rules
+Split each sentence into 2–5 parts by grammatical units:
+- subject or subject phrase
+- verb phrase (verb + auxiliary if any)
+- object or complement
+- adverbial (time, place, manner)
+Do NOT split single words unless the word itself is the entire meaningful unit.
 
-Return ONLY valid JSON array, no markdown, no extra text:
+## Pronunciation Rules
+- Write pronunciation as it sounds to a native ${uiLang} speaker
+- Mark stress with CAPITAL letter on the stressed syllable
+- Example: "nosotros hablamos" → "nosOtros abLAmos"
+- Avoid English-based approximations — use only sounds natural in ${uiLang}
+
+## Explanation Rules
+For each part write a short, encouraging explanation in ${uiLang} (1–2 sentences max):
+- Verbs: mention infinitive form + what conjugation this is
+- Nouns: mention grammatical gender (el/la) + note if similar to a ${uiLang} word
+- Prepositions and connectors: explain the usage pattern, not just the meaning
+- Do NOT state obvious things if the translation already says so
+
+## Tip Rules
+Add a "tip" field ONLY for: irregular forms, false friends, or tricky pronunciation.
+Omit "tip" entirely when there is nothing non-obvious to say.
+
+## Output Format
+Return ONLY a valid JSON array. No markdown, no explanation, no extra text.
+
 [
   {
     "sentence_text": "full sentence in ${langName}",
     "translation_ru": "translation in ${uiLang}",
-    "visual_svg": "<svg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'><path d='...' fill='currentColor'/></svg>",
     "parts": [
       {
         "text": "part of sentence",
         "translation_ru": "translation of this part in ${uiLang}",
-        "pronunciation": "how it sounds to ${uiLang} speaker",
-        "explanation": "grammar or usage note in ${uiLang} (1-2 sentences, interesting fact)",
-        "tip": "memory tip in ${uiLang} (optional, only if useful)"
+        "pronunciation": "stress marked with CAPITAL letters",
+        "explanation": "grammar note in ${uiLang}",
+        "tip": "only if non-obvious — omit otherwise"
       }
     ]
   }

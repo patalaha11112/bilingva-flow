@@ -331,7 +331,6 @@ export interface GeneratedSentence {
   sentence_text: string
   translation_ru: string
   translation_en?: string
-  visual_svg?: string
   parts: GeneratedSentencePart[]
 }
 

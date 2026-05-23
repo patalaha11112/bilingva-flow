@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Volume2, ChevronRight, Check, Plus, ArrowLeft, Loader2, RefreshCw } from 'lucide-react'
-import DOMPurify from 'dompurify'
 import { useUser } from '@/hooks/use-user'
 import { useSentences } from '@/hooks/use-sentences'
 import { t } from '@/lib/i18n'
@@ -244,20 +243,6 @@ function ListView({
                   )}>
                     {sentence.sentence_text}
                   </p>
-                  {sentence.visual_svg && (
-                    <div className="mt-2 flex items-center justify-start">
-                      <div className="h-12 w-12 flex items-center justify-center text-primary" style={{ color: 'var(--primary)' }}>
-                        <div
-                          dangerouslySetInnerHTML={{
-                            __html: DOMPurify.sanitize(sentence.visual_svg, {
-                              ALLOWED_TAGS: ['svg', 'path', 'circle', 'rect', 'ellipse', 'line', 'polyline', 'polygon'],
-                              ALLOWED_ATTR: ['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'fill', 'stroke', 'viewBox', 'xmlns', 'rx', 'ry', 'opacity', 'points'],
-                            })
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
                   <p className="text-xs text-muted-foreground mt-1">
                     {sentence.translation_ru}
                   </p>
@@ -408,20 +393,6 @@ function TrainView({
           <p className="text-2xl font-semibold leading-snug tracking-tight">
             {sentence.sentence_text}
           </p>
-          {sentence.visual_svg && (
-            <div className="py-2 flex items-center justify-start">
-              <div className="h-16 w-16 flex items-center justify-center text-primary" style={{ color: 'var(--primary)' }}>
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(sentence.visual_svg, {
-                      ALLOWED_TAGS: ['svg', 'path', 'circle', 'rect', 'ellipse', 'line', 'polyline', 'polygon'],
-                      ALLOWED_ATTR: ['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'fill', 'stroke', 'viewBox', 'xmlns', 'rx', 'ry', 'opacity', 'points'],
-                    })
-                  }}
-                />
-              </div>
-            </div>
-          )}
           <p className="text-sm text-muted-foreground">
             {sentence.translation_ru}
           </p>
