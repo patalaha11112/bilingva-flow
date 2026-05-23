@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type {
   SentenceWithParts,
@@ -48,7 +48,7 @@ export function useSentences({
   interfaceLanguage,
   enabled = true,
 }: UseSentencesParams): UseSentencesReturn {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [sentences, setSentences] = useState<SentenceWithParts[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -143,84 +143,31 @@ export function useSentences({
     fetchSentences()
   }, [fetchSentences])
 
-  // Отметить часть как понятую
+  // Отметить часть как понятую (через API с admin client — обходит RLS)
   const markPartUnderstood = async (sentenceId: string, partId: string) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const current = userProgress[sentenceId]
-    const currentParts = current?.understood_parts ?? []
-
-    // Тоггл: если уже отмечена — убираем, иначе добавляем
-    let newParts: string[]
-    if (currentParts.includes(partId)) {
-      newParts = currentParts.filter(id => id !== partId)
-    } else {
-      newParts = [...currentParts, partId]
-    }
-
-    const sentence = sentences.find(s => s.id === sentenceId)
-    const totalParts = sentence?.sentence_parts?.length ?? 0
-    const allUnderstood = newParts.length >= totalParts
-
-    const { data, error } = await supabase
-      .from('user_sentences')
-      .upsert({
-        user_id: user.id,
-        sentence_id: sentenceId,
-        language,
-        understood_parts: newParts,
-        all_understood: allUnderstood,
-        times_shown: (current?.times_shown ?? 0) + (current ? 0 : 1),
-        last_shown_at: new Date().toISOString(),
-        is_active: current?.is_active ?? true,
-        week_number: current?.week_number ?? 0,
-        year: current?.year ?? new Date().getFullYear(),
-      }, { onConflict: 'user_id,sentence_id' })
-      .select()
-      .single()
-
-    if (!error && data) {
-      setUserProgress(prev => ({ ...prev, [sentenceId]: data }))
+    const res = await fetch('/api/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sentence_id: sentenceId, part_id: partId, language }),
+    })
+    if (!res.ok) return
+    const data = await res.json() as { progress: UserSentence }
+    if (data.progress) {
+      setUserProgress(prev => ({ ...prev, [sentenceId]: data.progress }))
     }
   }
 
-  // Отметить все части как понятые (тоггл: если все уже отмечены — снять все)
+  // Отметить все части как понятые (тоггл)
   const markAllUnderstood = async (sentenceId: string) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const sentence = sentences.find(s => s.id === sentenceId)
-    if (!sentence) return
-
-    const allPartIds = (sentence.sentence_parts ?? []).map(p => p.id)
-    const current = userProgress[sentenceId]
-    const currentParts = current?.understood_parts ?? []
-
-    // Тоггл: если все уже отмечены — снимаем все, иначе отмечаем все
-    const isAllCurrentlyUnderstood = currentParts.length >= allPartIds.length
-    const newParts = isAllCurrentlyUnderstood ? [] : allPartIds
-    const allUnderstood = !isAllCurrentlyUnderstood
-
-    const { data, error } = await supabase
-      .from('user_sentences')
-      .upsert({
-        user_id: user.id,
-        sentence_id: sentenceId,
-        language,
-        understood_parts: newParts,
-        all_understood: allUnderstood,
-        times_shown: (current?.times_shown ?? 0) + (current ? 0 : 1),
-        last_shown_at: new Date().toISOString(),
-        is_active: current?.is_active ?? true,
-        week_number: current?.week_number ?? 0,
-        year: current?.year ?? new Date().getFullYear(),
-      }, { onConflict: 'user_id,sentence_id' })
-      .select()
-      .single()
-
-    if (!error && data) {
-      setUserProgress(prev => ({ ...prev, [sentenceId]: data }))
+    const res = await fetch('/api/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sentence_id: sentenceId, mark_all: true, language }),
+    })
+    if (!res.ok) return
+    const data = await res.json() as { progress: UserSentence }
+    if (data.progress) {
+      setUserProgress(prev => ({ ...prev, [sentenceId]: data.progress }))
     }
   }
 
