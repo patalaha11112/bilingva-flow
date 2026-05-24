@@ -405,14 +405,16 @@ export async function POST(request: NextRequest) {
 // ─────────────────────────────────────────
 async function fetchUserProgress(supabaseAdmin: any, userId: string, sentenceIds: string[]) {
   if (sentenceIds.length === 0) return {}
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('user_sentences')
     .select('sentence_id, understood_parts, all_understood, fully_mastered')
     .eq('user_id', userId)
     .in('sentence_id', sentenceIds)
+  console.log('[sentences] fetchUserProgress rows:', data?.length ?? 0, 'error:', error?.message)
   const map: Record<string, any> = {}
   for (const row of (data ?? [])) {
     map[row.sentence_id] = row
+    console.log('[sentences] progress for', row.sentence_id, 'parts:', (row.understood_parts as string[])?.length ?? 0)
   }
   return map
 }

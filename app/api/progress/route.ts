@@ -27,12 +27,15 @@ export async function POST(request: NextRequest) {
       language: LearningLang;
     };
 
-    const { data: current } = await supabaseAdmin
+    const { data: currentRows } = await supabaseAdmin
       .from("user_sentences")
       .select("*")
       .eq("user_id", user.id)
       .eq("sentence_id", sentence_id)
-      .single();
+      .limit(1);
+
+    const current = currentRows?.[0] ?? null;
+    console.log('[progress] sentence_id:', sentence_id, 'found rows:', currentRows?.length ?? 0, 'current:', !!current);
 
     const { data: partsData } = await supabaseAdmin
       .from("sentence_parts")
@@ -104,10 +107,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (error) {
-      console.error("Progress save error:", error);
+      console.error("[progress] save error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    console.log('[progress] saved ok, all_understood:', data?.all_understood, 'parts count:', data?.understood_parts?.length);
     return NextResponse.json({ progress: data });
   } catch (error) {
     console.error("Progress error:", error);
