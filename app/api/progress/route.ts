@@ -62,29 +62,49 @@ export async function POST(request: NextRequest) {
 
     const { week, year } = getISOWeek(new Date());
 
-    const { data, error } = await supabaseAdmin
-      .from("user_sentences")
-      .upsert(
-        {
+    let data: any = null;
+    let error: any = null;
+
+    if (current) {
+      // Record exists — update in place
+      const res = await supabaseAdmin
+        .from("user_sentences")
+        .update({
+          understood_parts: newParts,
+          all_understood: allUnderstood,
+          last_shown_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id)
+        .eq("sentence_id", sentence_id)
+        .select()
+        .single();
+      data = res.data;
+      error = res.error;
+    } else {
+      // No record yet — insert fresh
+      const res = await supabaseAdmin
+        .from("user_sentences")
+        .insert({
           user_id: user.id,
           sentence_id,
           language,
           understood_parts: newParts,
           all_understood: allUnderstood,
-          fully_mastered: current?.fully_mastered ?? false,
-          times_shown: (current?.times_shown ?? 0) + (current ? 0 : 1),
+          fully_mastered: false,
+          times_shown: 1,
           last_shown_at: new Date().toISOString(),
-          is_active: current?.is_active ?? true,
-          week_number: current?.week_number ?? week,
-          year: current?.year ?? year,
-        },
-        { onConflict: "user_id,sentence_id" }
-      )
-      .select()
-      .single();
+          is_active: true,
+          week_number: week,
+          year,
+        })
+        .select()
+        .single();
+      data = res.data;
+      error = res.error;
+    }
 
     if (error) {
-      console.error("Progress upsert error:", error);
+      console.error("Progress save error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
