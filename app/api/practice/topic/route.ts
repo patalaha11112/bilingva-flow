@@ -107,17 +107,22 @@ export async function GET(request: NextRequest) {
       .order('first_seen_at', { ascending: false })
       .limit(30)
 
+    console.log('[topic] user_sentences count:', weekUserSentences?.length ?? 0, 'language:', language, 'userId:', user.id)
+
     if (weekUserSentences && weekUserSentences.length > 0) {
       const understoodMap: Record<string, string[]> = {}
       for (const us of weekUserSentences) {
         understoodMap[us.sentence_id] = (us.understood_parts as string[]) ?? []
       }
 
-      const { data: allParts } = await supabaseAdmin
+      const sentenceIds = weekUserSentences.map(us => us.sentence_id)
+      const { data: allParts, error: partsError } = await supabaseAdmin
         .from('sentence_parts')
         .select('id, sentence_id, text, translation_ru, translation_en')
-        .in('sentence_id', weekUserSentences.map(us => us.sentence_id))
+        .in('sentence_id', sentenceIds)
         .order('order_index')
+
+      console.log('[topic] sentence_parts count:', allParts?.length ?? 0, 'error:', partsError?.message)
 
       if (allParts) {
         const seen = new Set<string>()
@@ -135,6 +140,8 @@ export async function GET(request: NextRequest) {
         }
       }
     }
+
+    console.log('[topic] suggestedWords count:', suggestedWords.length)
 
     return NextResponse.json({
       topic,
