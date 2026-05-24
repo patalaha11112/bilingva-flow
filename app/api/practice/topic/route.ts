@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       topic = options[new Date().getDay() % options.length]
     }
 
-    // Suggested words: parts the user hasn't marked as understood this week
+    // Suggested words: parts the user hasn't marked as understood (all recent sentences)
     let suggestedWords: { text: string; translation: string }[] = []
 
     const { data: weekUserSentences } = await supabaseAdmin
@@ -104,8 +104,8 @@ export async function GET(request: NextRequest) {
       .select('sentence_id, understood_parts')
       .eq('user_id', user.id)
       .eq('language', language)
-      .eq('week_number', week)
-      .eq('year', year)
+      .order('first_seen_at', { ascending: false })
+      .limit(30)
 
     if (weekUserSentences && weekUserSentences.length > 0) {
       const understoodMap: Record<string, string[]> = {}
