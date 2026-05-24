@@ -143,32 +143,63 @@ export function useSentences({
     fetchSentences()
   }, [fetchSentences])
 
-  // Отметить часть как понятую (через API с admin client — обходит RLS)
   const markPartUnderstood = async (sentenceId: string, partId: string) => {
-    const res = await fetch('/api/progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sentence_id: sentenceId, part_id: partId, language }),
+    // Optimistic update — toggle immediately so the UI responds on click
+    setUserProgress(prev => {
+      const current = prev[sentenceId]
+      const currentParts: string[] = (current?.understood_parts as string[]) ?? []
+      const newParts = currentParts.includes(partId)
+        ? currentParts.filter(id => id !== partId)
+        : [...currentParts, partId]
+      return {
+        ...prev,
+        [sentenceId]: { ...(current ?? {}), understood_parts: newParts, sentence_id: sentenceId } as UserSentence,
+      }
     })
-    if (!res.ok) return
-    const data = await res.json() as { progress: UserSentence }
-    if (data.progress) {
-      setUserProgress(prev => ({ ...prev, [sentenceId]: data.progress }))
-    }
+
+    // Persist in background; on success sync the authoritative state from server
+    try {
+      const res = await fetch('/api/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sentence_id: sentenceId, part_id: partId, language }),
+      })
+      if (!res.ok) return
+      const data = await res.json() as { progress: UserSentence }
+      if (data.progress) {
+        setUserProgress(prev => ({ ...prev, [sentenceId]: data.progress }))
+      }
+    } catch { /* optimistic state stays */ }
   }
 
-  // Отметить все части как понятые (тоггл)
   const markAllUnderstood = async (sentenceId: string) => {
-    const res = await fetch('/api/progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sentence_id: sentenceId, mark_all: true, language }),
+    const sentence = sentences.find(s => s.id === sentenceId)
+    const allPartIds = (sentence?.sentence_parts ?? []).map(p => p.id)
+
+    // Optimistic toggle
+    setUserProgress(prev => {
+      const current = prev[sentenceId]
+      const currentParts: string[] = (current?.understood_parts as string[]) ?? []
+      const isAll = allPartIds.length > 0 && currentParts.length >= allPartIds.length
+      const newParts = isAll ? [] : allPartIds
+      return {
+        ...prev,
+        [sentenceId]: { ...(current ?? {}), understood_parts: newParts, all_understood: !isAll, sentence_id: sentenceId } as UserSentence,
+      }
     })
-    if (!res.ok) return
-    const data = await res.json() as { progress: UserSentence }
-    if (data.progress) {
-      setUserProgress(prev => ({ ...prev, [sentenceId]: data.progress }))
-    }
+
+    try {
+      const res = await fetch('/api/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sentence_id: sentenceId, mark_all: true, language }),
+      })
+      if (!res.ok) return
+      const data = await res.json() as { progress: UserSentence }
+      if (data.progress) {
+        setUserProgress(prev => ({ ...prev, [sentenceId]: data.progress }))
+      }
+    } catch { /* optimistic state stays */ }
   }
 
   // Next sentence in training mode
