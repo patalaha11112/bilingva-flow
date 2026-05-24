@@ -140,10 +140,13 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      const savedIds = savedSentences.map((s: any) => s.id)
+      const userProgress = await fetchUserProgress(supabaseAdmin, user.id, savedIds)
       return NextResponse.json({
         sentences: savedSentences,
         generated: true,
         weeklyLimit: { total: savedSentences.length, max: 10 },
+        userProgress,
       });
     }
 
@@ -189,10 +192,13 @@ export async function POST(request: NextRequest) {
         .eq("year", currentYear)
         .eq("is_active", true);
 
+      const addIds = newSentences.map((s: any) => s.id)
+      const userProgress = await fetchUserProgress(supabaseAdmin, user.id, addIds)
       return NextResponse.json({
         sentences: newSentences,
         generated: true,
         weeklyLimit: { total: allActive?.length ?? add_count, max: 10 },
+        userProgress,
       });
     }
 
@@ -220,6 +226,7 @@ export async function POST(request: NextRequest) {
           )
           .in("id", activeSentenceIds.slice(0, 5));
 
+        const userProgress = await fetchUserProgress(supabaseAdmin, user.id, activeSentenceIds.slice(0, 5))
         return NextResponse.json({
           sentences: sentencesData ?? [],
           generated: false,
@@ -227,6 +234,7 @@ export async function POST(request: NextRequest) {
             total: activeSentences?.length ?? 0,
             max: 10,
           },
+          userProgress,
         });
       }
 
@@ -276,6 +284,8 @@ export async function POST(request: NextRequest) {
       }
 
       const totalSentences = [...existingSentences, ...newSentences];
+      const totalIds = totalSentences.map((s: any) => s.id)
+      const userProgress = await fetchUserProgress(supabaseAdmin, user.id, totalIds)
       return NextResponse.json({
         sentences: totalSentences,
         generated: newSentences.length > 0,
@@ -283,6 +293,7 @@ export async function POST(request: NextRequest) {
           total: activeSentenceIds.length + newSentences.length,
           max: 10,
         },
+        userProgress,
       });
     }
 
@@ -361,6 +372,8 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      const refreshIds = newSentences.map((s: any) => s.id)
+      const userProgress = await fetchUserProgress(supabaseAdmin, user.id, refreshIds)
       return NextResponse.json({
         sentences: newSentences,
         generated: true,
@@ -368,6 +381,7 @@ export async function POST(request: NextRequest) {
           total: (allThisWeek?.length ?? 0) + newSentences.length,
           max: 10,
         },
+        userProgress,
       });
     }
 
@@ -384,6 +398,23 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// ─────────────────────────────────────────
+// Helper: Get user progress for sentence IDs
+// ─────────────────────────────────────────
+async function fetchUserProgress(supabaseAdmin: any, userId: string, sentenceIds: string[]) {
+  if (sentenceIds.length === 0) return {}
+  const { data } = await supabaseAdmin
+    .from('user_sentences')
+    .select('sentence_id, understood_parts, all_understood, fully_mastered')
+    .eq('user_id', userId)
+    .in('sentence_id', sentenceIds)
+  const map: Record<string, any> = {}
+  for (const row of (data ?? [])) {
+    map[row.sentence_id] = row
+  }
+  return map
 }
 
 // ─────────────────────────────────────────

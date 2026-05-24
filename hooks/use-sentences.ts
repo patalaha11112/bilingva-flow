@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useEffect, useCallback } from 'react'
 import type {
   SentenceWithParts,
   UserSentence,
@@ -48,8 +47,6 @@ export function useSentences({
   interfaceLanguage,
   enabled = true,
 }: UseSentencesParams): UseSentencesReturn {
-  const supabase = useMemo(() => createClient(), [])
-
   const [sentences, setSentences] = useState<SentenceWithParts[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [userProgress, setUserProgress] = useState<Record<string, UserSentence>>({})
@@ -92,9 +89,10 @@ export function useSentences({
         throw new Error(errorMsg)
       }
 
-      const data = await res.json() as { 
+      const data = await res.json() as {
         sentences: SentenceWithParts[]
         weeklyLimit?: { total: number; max: number }
+        userProgress?: Record<string, UserSentence>
       }
 
       // Sort parts by order_index
@@ -107,28 +105,13 @@ export function useSentences({
 
       setSentences(sorted)
       setCurrentIndex(0)
-      
+
       if (data.weeklyLimit) {
         setWeeklyCount(data.weeklyLimit.total)
       }
 
-      // Load user progress for these sentences
-      if (sorted.length > 0) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        const ids = sorted.map(s => s.id)
-        const { data: progressData } = await supabase
-          .from('user_sentences')
-          .select('*')
-          .eq('user_id', user.id)
-          .in('sentence_id', ids)
-
-        const progressMap: Record<string, UserSentence> = {}
-        for (const p of progressData ?? []) {
-          progressMap[p.sentence_id] = p
-        }
-        setUserProgress(progressMap)
+      if (data.userProgress) {
+        setUserProgress(data.userProgress)
       }
 
     } catch (err) {
@@ -137,7 +120,7 @@ export function useSentences({
     } finally {
       setIsLoading(false)
     }
-  }, [language, level, topicId, customTopic, interfaceLanguage, enabled, supabase])
+  }, [language, level, topicId, customTopic, interfaceLanguage, enabled])
 
   useEffect(() => {
     fetchSentences()
@@ -241,9 +224,10 @@ export function useSentences({
         throw new Error(errorMsg)
       }
 
-      const data = await res.json() as { 
+      const data = await res.json() as {
         sentences: SentenceWithParts[]
         weeklyLimit?: { total: number; max: number }
+        userProgress?: Record<string, UserSentence>
       }
 
       const sorted = data.sentences.map(s => ({
@@ -260,23 +244,8 @@ export function useSentences({
         setWeeklyCount(data.weeklyLimit.total)
       }
 
-      // Load progress for new sentences
-      if (sorted.length > 0) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        const ids = sorted.map(s => s.id)
-        const { data: progressData } = await supabase
-          .from('user_sentences')
-          .select('*')
-          .eq('user_id', user.id)
-          .in('sentence_id', ids)
-
-        const newProgress: Record<string, UserSentence> = {}
-        for (const p of progressData ?? []) {
-          newProgress[p.sentence_id] = p
-        }
-        setUserProgress(prev => ({ ...prev, ...newProgress }))
+      if (data.userProgress) {
+        setUserProgress(prev => ({ ...prev, ...data.userProgress }))
       }
 
     } catch (err) {
@@ -318,9 +287,10 @@ export function useSentences({
         throw new Error(errorMsg)
       }
 
-      const data = await res.json() as { 
+      const data = await res.json() as {
         sentences: SentenceWithParts[]
         weeklyLimit?: { total: number; max: number }
+        userProgress?: Record<string, UserSentence>
       }
 
       const sorted = data.sentences.map(s => ({
@@ -338,23 +308,8 @@ export function useSentences({
         setWeeklyCount(data.weeklyLimit.total)
       }
 
-      // Load progress
-      if (sorted.length > 0) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        const ids = sorted.map(s => s.id)
-        const { data: progressData } = await supabase
-          .from('user_sentences')
-          .select('*')
-          .eq('user_id', user.id)
-          .in('sentence_id', ids)
-
-        const progressMap: Record<string, UserSentence> = {}
-        for (const p of progressData ?? []) {
-          progressMap[p.sentence_id] = p
-        }
-        setUserProgress(progressMap)
+      if (data.userProgress) {
+        setUserProgress(data.userProgress)
       }
 
     } catch (err) {
