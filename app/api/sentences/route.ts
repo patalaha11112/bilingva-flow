@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const { data: allActive } = await supabase
+      const { data: allActive } = await supabaseAdmin
         .from("user_sentences")
         .select("id")
         .eq("user_id", user.id)
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
     // 1. Get active sentences for this week
     // ─────────────────────────────────────────
     if (!refresh) {
-      const { data: activeSentences } = await supabase
+      const { data: activeSentences } = await supabaseAdmin
         .from("user_sentences")
         .select("sentence_id")
         .eq("user_id", user.id)
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
 
       // If we have 5 active sentences, return them
       if (activeSentenceIds.length >= 5) {
-        const { data: sentencesData } = await supabase
+        const { data: sentencesData } = await supabaseAdmin
           .from("sentences")
           .select(
             "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
       // If we have less than 5, load them and fill up to 5
       let existingSentences: any[] = [];
       if (activeSentenceIds.length > 0) {
-        const { data } = await supabase
+        const { data } = await supabaseAdmin
           .from("sentences")
           .select(
             "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
     // ─────────────────────────────────────────
     if (refresh) {
       // Check total active count before refresh
-      const { data: currentActive } = await supabase
+      const { data: currentActive } = await supabaseAdmin
         .from("user_sentences")
         .select("id")
         .eq("user_id", user.id)
@@ -310,7 +310,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if we can add more (max 10 per week)
-      const { data: allThisWeek } = await supabase
+      const { data: allThisWeek } = await supabaseAdmin
         .from("user_sentences")
         .select("id")
         .eq("user_id", user.id)
@@ -400,8 +400,8 @@ async function getNewSentences(
   interfaceLanguage: InterfaceLang,
   count: number
 ) {
-  // Get sentences user has already seen
-  const { data: seenData } = await supabase
+  // Get sentences user has already seen (admin to bypass RLS)
+  const { data: seenData } = await supabaseAdmin
     .from("user_sentences")
     .select("sentence_id")
     .eq("user_id", userId)
@@ -410,7 +410,7 @@ async function getNewSentences(
   const seenSet = new Set((seenData ?? []).map((r: any) => r.sentence_id));
 
   // Query available sentences
-  let query = supabase
+  let query = supabaseAdmin
     .from("sentences")
     .select(
       "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
@@ -438,7 +438,7 @@ async function getNewSentences(
   if (toGenerate > 0) {
     let topicName = customTopic ?? "";
     if (!topicName && topicId) {
-      const { data: topicData } = await supabase
+      const { data: topicData } = await supabaseAdmin
         .from("topics")
         .select("name_ru, name_en, name_es")
         .eq("id", topicId)
