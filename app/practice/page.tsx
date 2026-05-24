@@ -14,10 +14,24 @@ interface SuggestedWord {
   translation: string
 }
 
+interface Improvement {
+  original: string
+  better: string
+  why: string
+}
+
+interface Alternative {
+  phrase: string
+  options: string[]
+}
+
 interface FeedbackData {
   score: number
   feedback: string
   word_count: number
+  improvements: Improvement[]
+  alternatives: Alternative[]
+  fun_fact: string
 }
 
 export default function PracticePage() {
@@ -86,8 +100,18 @@ export default function PracticePage() {
         const err = await res.json().catch(() => ({})) as { error?: string }
         throw new Error(err.error ?? 'Server error')
       }
-      const data = await res.json() as { score: number; feedback: string; word_count: number }
-      setFeedbackData({ score: data.score, feedback: data.feedback, word_count: data.word_count })
+      const data = await res.json() as {
+        score: number; feedback: string; word_count: number
+        improvements: Improvement[]; alternatives: Alternative[]; fun_fact: string
+      }
+      setFeedbackData({
+        score: data.score,
+        feedback: data.feedback,
+        word_count: data.word_count,
+        improvements: data.improvements ?? [],
+        alternatives: data.alternatives ?? [],
+        fun_fact: data.fun_fact ?? '',
+      })
       setPhase('feedback')
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Error')
@@ -149,6 +173,15 @@ export default function PracticePage() {
   }
 
   if (phase === 'feedback' && feedbackData) {
+    const ui = {
+      improvements: lang === 'ru' ? 'Как улучшить' : lang === 'es' ? 'Cómo mejorar' : 'How to improve',
+      original: lang === 'ru' ? 'Было' : lang === 'es' ? 'Original' : 'Original',
+      better: lang === 'ru' ? 'Лучше' : lang === 'es' ? 'Mejor' : 'Better',
+      alternatives: lang === 'ru' ? 'Другие способы выразить' : lang === 'es' ? 'Otras formas de decirlo' : 'Alternative expressions',
+      instead: lang === 'ru' ? 'вместо' : lang === 'es' ? 'en vez de' : 'instead of',
+      funFact: lang === 'ru' ? 'Интересный факт' : lang === 'es' ? 'Dato curioso' : 'Fun fact',
+    }
+
     return (
       <div className="mx-auto max-w-lg px-4 py-6 space-y-4">
 
@@ -170,6 +203,71 @@ export default function PracticePage() {
           </p>
           <p className="text-sm leading-relaxed text-foreground/80">{feedbackData.feedback}</p>
         </section>
+
+        {/* Improvements */}
+        {feedbackData.improvements.length > 0 && (
+          <section className="rounded-2xl bg-card shadow-sm p-5 space-y-3">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground/50">
+              {ui.improvements}
+            </p>
+            <div className="space-y-3">
+              {feedbackData.improvements.map((item, i) => (
+                <div key={i} className="space-y-1.5">
+                  <div className="flex items-start gap-2 flex-wrap">
+                    <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground/50 mt-0.5 shrink-0">{ui.original}</span>
+                    <span className="text-sm line-through text-muted-foreground">{item.original}</span>
+                  </div>
+                  <div className="flex items-start gap-2 flex-wrap">
+                    <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-green-600 dark:text-green-400 mt-0.5 shrink-0">{ui.better}</span>
+                    <span className="text-sm font-medium text-green-700 dark:text-green-300">{item.better}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.why}</p>
+                  {i < feedbackData.improvements.length - 1 && (
+                    <div className="border-t border-border/50 pt-2" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Alternatives */}
+        {feedbackData.alternatives.length > 0 && (
+          <section className="rounded-2xl bg-card shadow-sm p-5 space-y-3">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground/50">
+              {ui.alternatives}
+            </p>
+            <div className="space-y-3">
+              {feedbackData.alternatives.map((item, i) => (
+                <div key={i} className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {ui.instead} <span className="font-medium text-foreground/70">«{item.phrase}»</span>:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {item.options.map((opt, j) => (
+                      <span key={j} className="rounded-lg border border-primary/25 bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary">
+                        {opt}
+                      </span>
+                    ))}
+                  </div>
+                  {i < feedbackData.alternatives.length - 1 && (
+                    <div className="border-t border-border/50 pt-1" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Fun fact */}
+        {feedbackData.fun_fact && (
+          <section className="rounded-2xl bg-card shadow-sm p-5 space-y-2">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground/50">
+              {ui.funFact}
+            </p>
+            <p className="text-sm leading-relaxed text-foreground/80">💡 {feedbackData.fun_fact}</p>
+          </section>
+        )}
 
         <button
           onClick={handleWriteAnother}

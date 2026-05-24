@@ -48,6 +48,9 @@ export async function POST(request: NextRequest) {
     let aiScore = 7
     let aiFeedback = ''
     let wordsUsed: string[] = []
+    let aiImprovements: { original: string; better: string; why: string }[] = []
+    let aiAlternatives: { phrase: string; options: string[] }[] = []
+    let aiFunFact = ''
 
     try {
       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
@@ -66,9 +69,28 @@ ${content}
 Return ONLY a valid JSON object, no markdown, no extra text:
 {
   "score": <integer 1-10>,
-  "feedback": "<2-3 sentences in ${uiLang}: start with specific genuine praise about something in the text, then one positive concrete tip if relevant. Never say what is missing.>",
+  "feedback": "<1-2 sentences of specific genuine praise about something concrete in this text>",
+  "improvements": [
+    {
+      "original": "<exact phrase from the essay>",
+      "better": "<corrected or improved version in ${langName}>",
+      "why": "<1 sentence explanation in ${uiLang}>"
+    }
+  ],
+  "alternatives": [
+    {
+      "phrase": "<phrase the student used>",
+      "options": ["<richer alternative in ${langName}>", "<another alternative>"]
+    }
+  ],
+  "fun_fact": "<one genuinely interesting or surprising fact about this topic or about ${langName}, in ${uiLang}>",
   "words_used": ["list", "of", "${langName}", "words", "detected", "in", "the", "essay"]
-}`
+}
+
+Rules:
+- improvements: 1–3 items, only for real grammar or vocabulary mistakes. Empty array if no mistakes.
+- alternatives: 1–2 items showing richer ways to express what the student already wrote.
+- fun_fact: always include. Make it specific and engaging, not generic.`
 
       const result = await model.generateContent(prompt)
       const text = result.response.text().trim()
@@ -77,6 +99,9 @@ Return ONLY a valid JSON object, no markdown, no extra text:
       aiScore = Math.min(10, Math.max(1, Number(parsed.score) || 7))
       aiFeedback = String(parsed.feedback ?? '')
       wordsUsed = Array.isArray(parsed.words_used) ? parsed.words_used.map(String) : []
+      aiImprovements = Array.isArray(parsed.improvements) ? parsed.improvements : []
+      aiAlternatives = Array.isArray(parsed.alternatives) ? parsed.alternatives : []
+      aiFunFact = String(parsed.fun_fact ?? '')
     } catch {
       aiFeedback = interface_language === 'ru' ? 'Отличная работа! Продолжай в том же духе.'
                  : interface_language === 'es' ? '¡Excelente trabajo! Sigue así.'
@@ -147,6 +172,9 @@ Return ONLY a valid JSON object, no markdown, no extra text:
       essay,
       score: aiScore,
       feedback: aiFeedback,
+      improvements: aiImprovements,
+      alternatives: aiAlternatives,
+      fun_fact: aiFunFact,
       word_count: wordCount,
     })
   } catch (err) {
