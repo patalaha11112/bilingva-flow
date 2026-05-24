@@ -96,19 +96,45 @@ export async function GET(request: NextRequest) {
       topic = options[new Date().getDay() % options.length]
     }
 
-    // Suggested words from unmastered weak parts
-    const { data: weakParts } = await supabaseAdmin
-      .from('user_weak_parts')
-      .select('text, translation_ru')
+    // Suggested words: parts the user hasn't marked as understood this week
+    let suggestedWords: { text: string; translation: string }[] = []
+
+    const { data: weekUserSentences } = await supabaseAdmin
+      .from('user_sentences')
+      .select('sentence_id, understood_parts')
       .eq('user_id', user.id)
       .eq('language', language)
-      .eq('mastered', false)
-      .limit(8)
+      .eq('week_number', week)
+      .eq('year', year)
 
-    const suggestedWords = (weakParts ?? []).map(w => ({
-      text: w.text,
-      translation: w.translation_ru,
-    }))
+    if (weekUserSentences && weekUserSentences.length > 0) {
+      const understoodMap: Record<string, string[]> = {}
+      for (const us of weekUserSentences) {
+        understoodMap[us.sentence_id] = (us.understood_parts as string[]) ?? []
+      }
+
+      const { data: allParts } = await supabaseAdmin
+        .from('sentence_parts')
+        .select('id, sentence_id, text, translation_ru, translation_en')
+        .in('sentence_id', weekUserSentences.map(us => us.sentence_id))
+        .order('order_index')
+
+      if (allParts) {
+        const seen = new Set<string>()
+        for (const p of allParts) {
+          if (suggestedWords.length >= 8) break
+          const understood = understoodMap[p.sentence_id] ?? []
+          if (understood.includes(p.id)) continue
+          const lc = p.text.toLowerCase()
+          if (seen.has(lc)) continue
+          seen.add(lc)
+          const translation = interfaceLang === 'ru'
+            ? p.translation_ru
+            : ((p.translation_en as string | null) ?? p.translation_ru)
+          suggestedWords.push({ text: p.text, translation })
+        }
+      }
+    }
 
     return NextResponse.json({
       topic,
