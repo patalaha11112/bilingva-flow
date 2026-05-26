@@ -19,13 +19,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'language and level required' }, { status: 400 })
     }
 
-    const { data: tips } = await supabaseAdmin
+    const { data: tips, error: tipsError } = await supabaseAdmin
       .from('level_tips')
       .select('tip_text, sort_order')
       .eq('language', language)
       .eq('level', level)
       .eq('interface_language', interfaceLang)
       .order('sort_order')
+
+    console.log('[tips] query:', { language, level, interfaceLang }, 'found:', tips?.length ?? 0, 'error:', tipsError?.message)
 
     if (!tips || tips.length === 0) {
       return NextResponse.json({ tip: null })
