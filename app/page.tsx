@@ -32,10 +32,10 @@ export default function Home() {
   }, [isLoading, user, router])
 
   useEffect(() => {
-    if (!profile || !activeLanguage) return
+    if (!profile) return
     const lang = profile.interface_language
-    const level = activeLanguage.level
-    const learningLang = activeLanguage.learning_language
+    const level = activeLanguage?.level ?? 'A1'
+    const learningLang = activeLanguage?.learning_language ?? 'es'
     fetch(`/api/tips?language=${learningLang}&level=${level}&interface_lang=${lang}`)
       .then(r => r.json())
       .then((d: { tip?: string | null }) => { if (d.tip) setTip(d.tip) })
