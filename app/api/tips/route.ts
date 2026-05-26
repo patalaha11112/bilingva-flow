@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
     const { data: tips, error: tipsError } = await supabaseAdmin
       .from('level_tips')
       .select('tip_text, sort_order')
-      .eq('language', language)
       .eq('level', level)
       .eq('interface_language', interfaceLang)
       .order('sort_order')
