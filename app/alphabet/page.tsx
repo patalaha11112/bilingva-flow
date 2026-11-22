@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { Volume2, Square } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
 import { getAlphabetData, type Letter, type Digraph } from '@/core/alphabet-data'
@@ -18,10 +18,6 @@ export default function AlphabetPage() {
   const interfaceLang: InterfaceLang = profile?.interface_language ?? 'ru'
 
   const [selected, setSelected] = useState<Letter | Digraph | null>(null)
-  const [explanation, setExplanation] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [isCached, setIsCached] = useState(false)
-  const [error, setError] = useState('')
   const [speaking, setSpeaking] = useState(false)
 
   const alphabetData = getAlphabetData(toLegacyLang(learningLang))
@@ -51,56 +47,10 @@ export default function AlphabetPage() {
 
   useEffect(() => {
     setSelected(null)
-    setExplanation('')
-    setError('')
   }, [learningLang])
 
-  const fetchExplanation = async (letterObj: Letter | Digraph) => {
-    if (selected?.letter === letterObj.letter && explanation) return
-    setSelected(letterObj)
-    setExplanation('')
-    setError('')
-    setIsCached(false)
-    setLoading(true)
-
-    try {
-      const response = await fetch('/api/alphabet-explain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          letter: letterObj.letter,
-          name: letterObj.name,
-          learningLanguage: learningLang,
-          interfaceLanguage: interfaceLang,
-        }),
-      })
-
-      const data = await response.json()
-      if (data.explanation) {
-        setExplanation(data.explanation)
-        setIsCached(data.cached === true)
-      } else {
-        setError(uiText.error[interfaceLang])
-      }
-    } catch {
-      setError(uiText.connError[interfaceLang])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const renderExplanation = (text: string) => {
-    return text.split('\n').map((line, i) => {
-      const bold = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-foreground">$1</strong>')
-      return (
-        <p
-          key={i}
-          className="mb-2 leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: bold }}
-        />
-      )
-    })
-  }
+  // Translations are hidden when the interface language is the language being learned
+  const showTranslation = interfaceLang !== learningLang
 
   const isSpecial = (item: Letter | Digraph): boolean =>
     'isSpecial' in item && !!item.isSpecial
@@ -135,7 +85,7 @@ export default function AlphabetPage() {
               name={l.name}
               isSpecial={!!l.isSpecial}
               isSelected={selected?.letter === l.letter}
-              onClick={() => fetchExplanation(l)}
+              onClick={() => setSelected(l)}
             />
           ))}
         </div>
@@ -158,7 +108,7 @@ export default function AlphabetPage() {
                 name={d.name}
                 isSpecial
                 isSelected={selected?.letter === d.letter}
-                onClick={() => fetchExplanation(d)}
+                onClick={() => setSelected(d)}
               />
             ))}
           </div>
@@ -239,47 +189,58 @@ export default function AlphabetPage() {
               </div>
             </div>
 
-            {/* Explanation label */}
-            <div className="flex items-center gap-2">
-              <p className="text-[0.62rem] font-semibold uppercase tracking-widest text-muted-foreground/45">
-                {uiText.explanationBy[interfaceLang]}
+            {/* How it sounds */}
+            <section className="space-y-1.5">
+              <SectionLabel>{uiText.how[interfaceLang]}</SectionLabel>
+              <p className="text-[0.9rem] leading-relaxed text-foreground/75">
+                {selected.how[interfaceLang]}
               </p>
-              {isCached && (
-                <span className="rounded border border-border/60 bg-muted/60 px-1.5 py-0.5 text-[0.58rem] text-muted-foreground/60">
-                  {uiText.cached[interfaceLang]}
-                </span>
-              )}
-            </div>
+            </section>
 
-            {/* Loading dots */}
-            {loading && (
-              <div className="flex items-center gap-1.5 py-1">
-                {[0, 160, 320].map(delay => (
-                  <span
-                    key={delay}
-                    className="h-2 w-2 animate-pulse rounded-full bg-primary"
-                    style={{ animationDelay: `${delay}ms` }}
-                  />
+            {/* Examples */}
+            <section className="space-y-1.5">
+              <SectionLabel>{uiText.examples[interfaceLang]}</SectionLabel>
+              <ul className="space-y-1">
+                {selected.examples.map((ex) => (
+                  <li key={ex.word} className="flex items-center gap-2 text-[0.9rem]">
+                    <button
+                      onClick={() => speak(ex.word)}
+                      className="text-primary/70 hover:text-primary transition-colors cursor-pointer"
+                      aria-label={ex.word}
+                    >
+                      <Volume2 className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="font-semibold text-foreground">{ex.word}</span>
+                    {showTranslation && ex.tr[interfaceLang] && (
+                      <span className="text-muted-foreground">— {ex.tr[interfaceLang]}</span>
+                    )}
+                  </li>
                 ))}
-              </div>
-            )}
+              </ul>
+            </section>
 
-            {/* Error */}
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
-
-            {/* Explanation content */}
-            {explanation && !loading && (
-              <div className="text-[0.9rem] leading-relaxed text-foreground/75">
-                {renderExplanation(explanation)}
-              </div>
+            {/* Tip */}
+            {selected.tip && (
+              <section className="rounded-xl bg-primary/5 border border-primary/15 px-3.5 py-2.5 space-y-1">
+                <SectionLabel>{uiText.tip[interfaceLang]}</SectionLabel>
+                <p className="text-[0.85rem] leading-relaxed text-foreground/75">
+                  {selected.tip[interfaceLang]}
+                </p>
+              </section>
             )}
           </div>
         )}
       </div>
 
     </div>
+  )
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[0.62rem] font-semibold uppercase tracking-widest text-muted-foreground/45">
+      {children}
+    </p>
   )
 }
 
@@ -334,9 +295,9 @@ function LetterButton({
 
 const uiText: Record<string, Record<InterfaceLang, string>> = {
   subtitle: {
-    ru: 'Нажми на букву — Claude объяснит как читается',
-    en: 'Tap a letter — Claude will explain its pronunciation',
-    es: 'Toca una letra — Claude explicará su pronunciación',
+    ru: 'Нажми на букву, чтобы узнать, как она читается',
+    en: 'Tap a letter to learn how it sounds',
+    es: 'Toca una letra para ver cómo se pronuncia',
   },
   digraphs: {
     ru: 'Диграфы',
@@ -368,24 +329,19 @@ const uiText: Record<string, Record<InterfaceLang, string>> = {
     en: 'Stop',
     es: 'Parar',
   },
-  explanationBy: {
-    ru: 'Объяснение от Claude',
-    en: 'Explanation by Claude',
-    es: 'Explicación de Claude',
+  how: {
+    ru: 'Как читается',
+    en: 'How it sounds',
+    es: 'Cómo se pronuncia',
   },
-  cached: {
-    ru: 'из кэша',
-    en: 'cached',
-    es: 'del caché',
+  examples: {
+    ru: 'Примеры',
+    en: 'Examples',
+    es: 'Ejemplos',
   },
-  error: {
-    ru: 'Не удалось получить объяснение',
-    en: 'Failed to get explanation',
-    es: 'No se pudo obtener la explicación',
-  },
-  connError: {
-    ru: 'Ошибка соединения',
-    en: 'Connection error',
-    es: 'Error de conexión',
+  tip: {
+    ru: 'Обрати внимание',
+    en: 'Watch out',
+    es: 'Ojo',
   },
 }
