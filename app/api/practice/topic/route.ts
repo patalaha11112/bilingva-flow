@@ -107,8 +107,6 @@ export async function GET(request: NextRequest) {
       .order('first_seen_at', { ascending: false })
       .limit(30)
 
-    console.log('[topic] user_sentences count:', weekUserSentences?.length ?? 0, 'language:', language, 'userId:', user.id)
-
     if (weekUserSentences && weekUserSentences.length > 0) {
       const understoodMap: Record<string, string[]> = {}
       for (const us of weekUserSentences) {
@@ -122,7 +120,7 @@ export async function GET(request: NextRequest) {
         .in('sentence_id', sentenceIds)
         .order('order_index')
 
-      console.log('[topic] sentence_parts count:', allParts?.length ?? 0, 'error:', partsError?.message)
+      if (partsError) console.error('[topic] sentence_parts error:', partsError.message)
 
       if (allParts) {
         const seen = new Set<string>()
@@ -140,8 +138,6 @@ export async function GET(request: NextRequest) {
         }
       }
     }
-
-    console.log('[topic] suggestedWords count:', suggestedWords.length)
 
     return NextResponse.json({
       topic,

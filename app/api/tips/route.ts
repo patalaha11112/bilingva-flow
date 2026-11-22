@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       .eq('interface_language', interfaceLang)
       .order('sort_order')
 
-    console.log('[tips] query:', { language, level, interfaceLang }, 'found:', tips?.length ?? 0, 'error:', tipsError?.message)
+    if (tipsError) console.error('[tips] query error:', tipsError.message)
 
     if (!tips || tips.length === 0) {
       return NextResponse.json({ tip: null })

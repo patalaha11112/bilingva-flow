@@ -284,11 +284,10 @@ async function fetchUserProgress(supabaseAdmin: any, userId: string, sentenceIds
     .select('sentence_id, understood_parts, all_understood, fully_mastered')
     .eq('user_id', userId)
     .in('sentence_id', sentenceIds)
-  console.log('[sentences] fetchUserProgress rows:', data?.length ?? 0, 'error:', error?.message)
+  if (error) console.error('[sentences] fetchUserProgress error:', error.message)
   const map: Record<string, any> = {}
   for (const row of (data ?? [])) {
     map[row.sentence_id] = row
-    console.log('[sentences] progress for', row.sentence_id, 'parts:', (row.understood_parts as string[])?.length ?? 0)
   }
   return map
 }
