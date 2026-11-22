@@ -272,7 +272,7 @@ export function useSentences({
           topic_id: topicId,
           custom_topic: customTopic,
           interface_language: interfaceLanguage,
-          dev_reset: true,
+          refresh: true,
         }),
       })
 

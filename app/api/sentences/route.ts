@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { language, level, topic_id, custom_topic, interface_language, refresh, add_count, dev_reset } =
+    const { language, level, topic_id, custom_topic, interface_language, refresh, add_count } =
       (await request.json()) as {
         language: LearningLang;
         level: Level;
@@ -43,112 +43,9 @@ export async function POST(request: NextRequest) {
         interface_language: InterfaceLang;
         refresh?: boolean;
         add_count?: number;
-        dev_reset?: boolean;
       };
 
     const { week: currentWeek, year: currentYear } = getISOWeek(new Date());
-
-    // ─────────────────────────────────────────
-    // DEV RESET: wipe all records, generate fresh
-    // ─────────────────────────────────────────
-    if (dev_reset) {
-      await supabaseAdmin
-        .from("user_sentences")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("language", language);
-
-      let topicName = custom_topic ?? "";
-      if (!topicName && topic_id) {
-        const { data: topicData } = await supabase
-          .from("topics")
-          .select("name_ru, name_en, name_es")
-          .eq("id", topic_id)
-          .single();
-        if (topicData) {
-          topicName =
-            interface_language === "ru"
-              ? topicData.name_ru
-              : interface_language === "es"
-                ? topicData.name_es
-                : topicData.name_en;
-        }
-      }
-
-      const generated = await generateSentences({
-        language,
-        level,
-        topicName,
-        interfaceLanguage: interface_language,
-        count: 5,
-      });
-
-      const savedSentences: any[] = [];
-      for (const s of generated) {
-        const { data: sentenceRow } = await supabaseAdmin
-          .from("sentences")
-          .insert({
-            language,
-            level,
-            topic_id: topic_id ?? null,
-            custom_topic: custom_topic ?? null,
-            sentence_text: s.sentence_text,
-            translation_ru: s.translation_ru,
-            translation_en: s.translation_en ?? null,
-            ai_model: "gemini",
-            times_shown: 0,
-          })
-          .select()
-          .single();
-
-        if (sentenceRow && s.parts.length > 0) {
-          await supabaseAdmin.from("sentence_parts").insert(
-            s.parts.map((part: any, index: number) => ({
-              sentence_id: sentenceRow.id,
-              order_index: index,
-              text: part.text,
-              translation_ru: part.translation_ru,
-              translation_en: part.translation_en ?? null,
-              pronunciation: part.pronunciation,
-              explanation: part.explanation ?? null,
-              tip: part.tip ?? null,
-            }))
-          );
-
-          await supabaseAdmin.from("user_sentences").insert({
-            user_id: user.id,
-            sentence_id: sentenceRow.id,
-            language,
-            understood_parts: [],
-            all_understood: false,
-            times_shown: 0,
-            last_shown_at: null,
-            fully_mastered: false,
-            first_seen_at: new Date().toISOString(),
-            is_active: true,
-            week_number: currentWeek,
-            year: currentYear,
-          });
-
-          const { data: full } = await supabaseAdmin
-            .from("sentences")
-            .select("*, sentence_parts(*)")
-            .eq("id", sentenceRow.id)
-            .single();
-
-          if (full) savedSentences.push(full);
-        }
-      }
-
-      const savedIds = savedSentences.map((s: any) => s.id)
-      const userProgress = await fetchUserProgress(supabaseAdmin, user.id, savedIds)
-      return NextResponse.json({
-        sentences: savedSentences,
-        generated: true,
-        weeklyLimit: { total: savedSentences.length, max: 10 },
-        userProgress,
-      });
-    }
 
     // ─────────────────────────────────────────
     // ADD 1: add exactly N new sentences
@@ -298,10 +195,9 @@ export async function POST(request: NextRequest) {
     }
 
     // ─────────────────────────────────────────
-    // 2. REFRESH: Deactivate old, get 5 new
+    // 2. REFRESH: replace active set with 5 new, keep progress
     // ─────────────────────────────────────────
     if (refresh) {
-      // Check total active count before refresh
       const { data: currentActive } = await supabaseAdmin
         .from("user_sentences")
         .select("id")
@@ -311,37 +207,7 @@ export async function POST(request: NextRequest) {
         .eq("year", currentYear)
         .eq("is_active", true);
 
-      // Deactivate all current active sentences
-      if (currentActive && currentActive.length > 0) {
-        const currentActiveIds = currentActive.map((r) => r.id);
-        await supabaseAdmin
-          .from("user_sentences")
-          .update({ is_active: false })
-          .in("id", currentActiveIds);
-      }
-
-      // Check if we can add more (max 10 per week)
-      const { data: allThisWeek } = await supabaseAdmin
-        .from("user_sentences")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("language", language)
-        .eq("week_number", currentWeek)
-        .eq("year", currentYear);
-
-      if ((allThisWeek?.length ?? 0) >= 10) {
-        return NextResponse.json({
-          sentences: [],
-          generated: false,
-          error: "Weekly limit reached",
-          weeklyLimit: {
-            total: allThisWeek?.length ?? 10,
-            max: 10,
-          },
-        });
-      }
-
-      // Get 5 new sentences
+      // Get 5 new sentences first, so a generation failure leaves the current set intact
       const newSentences = await getNewSentences(
         supabase,
         supabaseAdmin,
@@ -353,6 +219,14 @@ export async function POST(request: NextRequest) {
         interface_language,
         5
       );
+
+      // Hide current sentences (progress is kept for hints and history)
+      if (currentActive && currentActive.length > 0) {
+        await supabaseAdmin
+          .from("user_sentences")
+          .update({ is_active: false })
+          .in("id", currentActive.map((r) => r.id));
+      }
 
       // Save with current week info
       for (const s of newSentences) {
@@ -378,7 +252,7 @@ export async function POST(request: NextRequest) {
         sentences: newSentences,
         generated: true,
         weeklyLimit: {
-          total: (allThisWeek?.length ?? 0) + newSentences.length,
+          total: newSentences.length,
           max: 10,
         },
         userProgress,
