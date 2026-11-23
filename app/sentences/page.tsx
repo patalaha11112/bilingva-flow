@@ -195,7 +195,7 @@ function ListView({
                     {sentence.sentence_text}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {sentence.translation_ru}
+                    {sentence.translation}
                   </p>
                   {total > 0 && (
                     <div className="mt-2 flex items-center gap-2">
@@ -333,7 +333,7 @@ function TrainView({
             {sentence.sentence_text}
           </p>
           <p className="text-sm text-muted-foreground">
-            {sentence.translation_ru}
+            {sentence.translation}
           </p>
           <button
             onClick={() => speak(sentence.sentence_text, sentence.language)}
@@ -467,7 +467,7 @@ function PartCard({
 
           {/* Translation */}
           <p className="text-sm text-muted-foreground mt-0.5">
-            {part.translation_ru}
+            {part.translation}
           </p>
 
           {/* Explanation + tip — always visible */}

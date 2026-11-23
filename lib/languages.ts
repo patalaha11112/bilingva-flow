@@ -90,6 +90,15 @@ export const DEFAULT_LEARNING_LANG: LearningLang = 'es'
 export const INTERFACE_LANG_CODES = Object.keys(INTERFACE_LANGUAGES) as InterfaceLang[]
 export const LEARNING_LANG_CODES = Object.keys(LEARNING_LANGUAGES) as LearningLang[]
 
+/** Text stored per interface language, e.g. topics.name = { ru: '…', en: '…' } */
+export type Localized = Partial<Record<InterfaceLang, string>>
+
+/** Picks the text for `lang`, falling back to the default interface language, then to any value */
+export function localized(value: Localized | null | undefined, lang: InterfaceLang): string {
+  if (!value) return ''
+  return value[lang] || value[DEFAULT_INTERFACE_LANG] || Object.values(value).find(Boolean) || ''
+}
+
 export function getInterfaceLanguage(code: InterfaceLang): InterfaceLanguageInfo {
   return INTERFACE_LANGUAGES[code]
 }

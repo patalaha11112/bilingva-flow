@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getInterfaceLanguage, getLearningLanguage } from "@/lib/languages";
+import { getInterfaceLanguage, getLearningLanguage, localized } from "@/lib/languages";
 import {
   LIMITS,
   getWeekStart,
@@ -13,7 +13,6 @@ import {
   isUuid,
   sanitizePromptText,
 } from "@/lib/server/access";
-import { TOPIC_NAME_COLUMNS, pickTopicName } from "@/lib/server/db-l10n";
 import type {
   LearningLang,
   Level,
@@ -24,7 +23,30 @@ import type {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 const SENTENCE_FIELDS =
-  "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)";
+  "id, sentence_text, translation, topic_id, custom_topic, language, interface_language, sentence_parts(*)";
+
+/**
+ * The user's active sentences this week for one learning language, written for
+ * one interface language (switching the interface language shows a separate set).
+ */
+function activeThisWeek(
+  supabase: any,
+  userId: string,
+  language: LearningLang,
+  interfaceLanguage: InterfaceLang,
+  weekStart: string,
+  columns: string,
+  options?: { count: "exact"; head: true }
+) {
+  return supabase
+    .from("user_sentences")
+    .select(`${columns}, sentences!inner(interface_language)`, options)
+    .eq("user_id", userId)
+    .eq("language", language)
+    .eq("sentences.interface_language", interfaceLanguage)
+    .gte("first_seen_at", weekStart)
+    .eq("is_active", true);
+}
 
 /** Links new sentences to the user as part of the current week's active set */
 async function linkSentences(supabase: any, userId: string, language: LearningLang, sentenceIds: string[]) {
@@ -98,13 +120,9 @@ export async function POST(request: NextRequest) {
     // ADD 1: add exactly N new sentences
     // ─────────────────────────────────────────
     if (add_count) {
-      const { count: activeCount } = await supabase
-        .from("user_sentences")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("language", language)
-        .gte("first_seen_at", weekStart)
-        .eq("is_active", true);
+      const { count: activeCount } = await activeThisWeek(
+        supabase, user.id, language, interface_language, weekStart, "id", { count: "exact", head: true }
+      );
       const requested = admin ? Math.min(Math.max(1, Math.floor(Number(add_count)) || 1), 20) : 1;
       const count = Math.min(requested, remaining, maxActive - (activeCount ?? 0));
       if (count <= 0) return limitReached();
@@ -123,13 +141,9 @@ export async function POST(request: NextRequest) {
 
       await linkSentences(supabase, user.id, language, newSentences.map((s: any) => s.id));
 
-      const { data: allActive } = await supabase
-        .from("user_sentences")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("language", language)
-        .gte("first_seen_at", weekStart)
-        .eq("is_active", true);
+      const { data: allActive } = await activeThisWeek(
+        supabase, user.id, language, interface_language, weekStart, "id"
+      );
 
       const addIds = newSentences.map((s: any) => s.id)
       const userProgress = await fetchUserProgress(supabase, user.id, addIds)
@@ -145,14 +159,9 @@ export async function POST(request: NextRequest) {
     // 1. Get active sentences for this week
     // ─────────────────────────────────────────
     if (!refresh) {
-      const { data: activeRows, error: activeError } = await supabase
-        .from("user_sentences")
-        .select("sentence_id")
-        .eq("user_id", user.id)
-        .eq("language", language)
-        .gte("first_seen_at", weekStart)
-        .eq("is_active", true)
-        .order("first_seen_at", { ascending: true });
+      const { data: activeRows, error: activeError } = await activeThisWeek(
+        supabase, user.id, language, interface_language, weekStart, "sentence_id"
+      ).order("first_seen_at", { ascending: true });
       if (activeError) console.error("[sentences] active fetch error:", activeError.message);
 
       const activeSentenceIds: string[] = (activeRows ?? []).map((r: any) => r.sentence_id);
@@ -201,13 +210,9 @@ export async function POST(request: NextRequest) {
     if (refresh) {
       if (remaining < 5) return limitReached();
 
-      const { data: currentActive } = await supabase
-        .from("user_sentences")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("language", language)
-        .gte("first_seen_at", weekStart)
-        .eq("is_active", true);
+      const { data: currentActive } = await activeThisWeek(
+        supabase, user.id, language, interface_language, weekStart, "id"
+      );
 
       // Get 5 new sentences first, so a generation failure leaves the current set intact
       const newSentences = await getNewSentences(
@@ -227,7 +232,7 @@ export async function POST(request: NextRequest) {
         await supabase
           .from("user_sentences")
           .update({ is_active: false })
-          .in("id", currentActive.map((r) => r.id));
+          .in("id", currentActive.map((r: any) => r.id));
       }
 
       // Save with current week info
@@ -307,6 +312,7 @@ async function getNewSentences(
     .from("sentences")
     .select(SENTENCE_FIELDS)
     .eq("language", language)
+    .eq("interface_language", interfaceLanguage)
     .eq("level", level);
 
   if (topicId) query = query.eq("topic_id", topicId);
@@ -331,12 +337,12 @@ async function getNewSentences(
     if (!topicName && topicId) {
       const { data: topicData } = await supabase
         .from("topics")
-        .select(TOPIC_NAME_COLUMNS)
+        .select("name")
         .eq("id", topicId)
         .single();
 
       if (topicData) {
-        topicName = pickTopicName(topicData, interfaceLanguage);
+        topicName = localized(topicData.name, interfaceLanguage);
       }
     }
 
@@ -358,8 +364,8 @@ async function getNewSentences(
           topic_id: topicId ?? null,
           custom_topic: customTopic ?? null,
           sentence_text: s.sentence_text,
-          translation_ru: s.translation_ru,
-          translation_en: s.translation_en ?? null,
+          interface_language: interfaceLanguage,
+          translation: s.translation,
           ai_model: "gemini",
           times_shown: 0,
         })
@@ -372,8 +378,7 @@ async function getNewSentences(
             sentence_id: sentenceRow.id,
             order_index: index,
             text: part.text,
-            translation_ru: part.translation_ru,
-            translation_en: part.translation_en ?? null,
+            translation: part.translation,
             pronunciation: part.pronunciation,
             explanation: part.explanation ?? null,
             tip: part.tip ?? null,
@@ -467,11 +472,11 @@ Return ONLY a valid JSON array. No markdown, no explanation, no extra text.
 [
   {
     "sentence_text": "full sentence in ${langName}",
-    "translation_ru": "translation in ${uiLang}",
+    "translation": "translation in ${uiLang}",
     "parts": [
       {
         "text": "part of sentence",
-        "translation_ru": "translation of this part in ${uiLang}",
+        "translation": "translation of this part in ${uiLang}",
         "pronunciation": "stress marked with CAPITAL letters",
         "explanation": "grammar note in ${uiLang}",
         "tip": "only if non-obvious — omit otherwise"
@@ -497,7 +502,7 @@ Return ONLY a valid JSON array. No markdown, no explanation, no extra text.
     return parsed.filter(
       (s) =>
         s.sentence_text &&
-        s.translation_ru &&
+        s.translation &&
         Array.isArray(s.parts) &&
         s.parts.length > 0,
     );

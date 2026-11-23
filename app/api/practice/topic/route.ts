@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { InterfaceLang, LearningLang } from '@/types/database'
-import { DEFAULT_INTERFACE_LANG } from '@/lib/languages'
+import { DEFAULT_INTERFACE_LANG, localized } from '@/lib/languages'
 import { getMessages } from '@/locales'
 import { getWeekStart, isInterfaceLang, isLearningLang } from '@/lib/server/access'
-import { TOPIC_NAME_COLUMNS, pickPartTranslation, pickTopicName } from '@/lib/server/db-l10n'
 
 function getISOWeek(date: Date): { week: number; year: number } {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
@@ -75,12 +74,12 @@ export async function GET(request: NextRequest) {
         if (topTopicId) {
           const { data: topicData } = await supabase
             .from('topics')
-            .select(TOPIC_NAME_COLUMNS)
+            .select('name')
             .eq('id', topTopicId)
             .single()
 
           if (topicData) {
-            topic = pickTopicName(topicData, uiLang)
+            topic = localized(topicData.name, uiLang)
           }
         }
       }
@@ -111,8 +110,9 @@ export async function GET(request: NextRequest) {
       const sentenceIds = weekUserSentences.map(us => us.sentence_id)
       const { data: allParts, error: partsError } = await supabase
         .from('sentence_parts')
-        .select('id, sentence_id, text, translation_ru, translation_en')
+        .select('id, sentence_id, text, translation, sentences!inner(interface_language)')
         .in('sentence_id', sentenceIds)
+        .eq('sentences.interface_language', uiLang)
         .order('order_index')
 
       if (partsError) console.error('[topic] sentence_parts error:', partsError.message)
@@ -126,8 +126,7 @@ export async function GET(request: NextRequest) {
           const lc = p.text.toLowerCase()
           if (seen.has(lc)) continue
           seen.add(lc)
-          const translation = pickPartTranslation(p, uiLang)
-          suggestedWords.push({ text: p.text, translation })
+          suggestedWords.push({ text: p.text, translation: p.translation })
         }
       }
     }

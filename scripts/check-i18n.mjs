@@ -7,7 +7,7 @@ import { join } from 'node:path'
 
 const ROOTS = ['app', 'components', 'hooks', 'lib']
 // Language data that is content, not UI text
-const ALLOWED_FILES = new Set(['lib/languages.ts', 'lib/server/db-l10n.ts'])
+const ALLOWED_FILES = new Set(['lib/languages.ts'])
 
 const CYRILLIC = /[А-Яа-яЁё]/
 const LANG_BRANCH = /(lang|interfaceLang|interface_language|interfaceLanguage)\s*===\s*['"](ru|en|es)['"]/

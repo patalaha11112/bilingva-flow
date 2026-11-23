@@ -9,7 +9,7 @@
 
 // Language codes come from the registry; they must match the Postgres enums
 // interface_lang and learning_lang (see lib/languages.ts)
-import type { InterfaceLang, LearningLang } from '@/lib/languages'
+import type { InterfaceLang, LearningLang, Localized } from '@/lib/languages'
 export type { InterfaceLang, LearningLang }
 
 export type Level = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'
@@ -46,9 +46,8 @@ export interface Topic {
   id: string
   language: LearningLang
   level: Level
-  name_ru: string
-  name_en: string
-  name_es: string
+  /** Name per interface language */
+  name: Localized
   is_active: boolean
   sort_order: number
   created_at: string
@@ -60,9 +59,10 @@ export interface Sentence {
   level: Level
   topic_id: string | null
   custom_topic: string | null
+  /** Language the translation and explanations are written in */
+  interface_language: InterfaceLang
   sentence_text: string
-  translation_ru: string
-  translation_en: string | null
+  translation: string
   visual_svg: string | null
   ai_model: AIModel
   times_shown: number
@@ -74,8 +74,7 @@ export interface SentencePart {
   sentence_id: string
   order_index: number
   text: string
-  translation_ru: string
-  translation_en: string | null
+  translation: string
   pronunciation: string
   explanation: string | null
   tip: string | null
@@ -103,7 +102,7 @@ export interface UserWeakPart {
   sentence_part_id: string | null
   language: LearningLang
   text: string
-  translation_ru: string
+  translation: string
   context_sentence: string | null
   times_practiced: number
   mastered: boolean
@@ -205,7 +204,7 @@ export interface BookSavedItem {
   type: SavedItemType
   text: string
   context_sentence: string | null
-  translation_ru: string | null
+  translation: string | null
   ai_explanation: string | null
   practiced: boolean
   added_to_module: boolean
@@ -320,15 +319,13 @@ export interface GenerateSentencesParams {
 // Ответ AI при генерации предложений
 export interface GeneratedSentence {
   sentence_text: string
-  translation_ru: string
-  translation_en?: string
+  translation: string
   parts: GeneratedSentencePart[]
 }
 
 export interface GeneratedSentencePart {
   text: string
-  translation_ru: string
-  translation_en?: string
+  translation: string
   pronunciation: string
   explanation?: string
   tip?: string
