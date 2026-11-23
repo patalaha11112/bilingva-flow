@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { InterfaceLang, LearningLang, Level } from '@/types/database'
-import { getInterfaceLanguage, getLearningLanguage } from '@/lib/languages'
+import { AI_MODELS, generateJson } from '@/lib/server/ai'
+import { ESSAY_SCHEMA, essayPrompt } from '@/lib/server/prompts'
 import { getMessages } from '@/locales'
-import { LIMITS, isAppAdmin, isInterfaceLang, isLearningLang, isLevel, sanitizePromptText } from '@/lib/server/access'
+import { LIMITS, isAppAdmin, sanitizePromptText } from '@/lib/server/access'
+import { EssayBody, parseBody } from '@/lib/server/validation'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 function getISOWeek(date: Date): { week: number; year: number } {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
@@ -22,6 +22,9 @@ function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length
 }
 
+// AI generation takes 10–25 s; allow for a slow primary model plus the fallback
+export const maxDuration = 120
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -31,21 +34,9 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { content, topic, language, level, interface_language, is_bonus } = await request.json() as {
-      content: string
-      topic: string
-      language: LearningLang
-      level: Level
-      interface_language: InterfaceLang
-      is_bonus?: boolean
-    }
-
-    if (typeof content !== 'string' || !content.trim()) {
-      return NextResponse.json({ error: 'Content is required' }, { status: 400 })
-    }
-    if (!isLearningLang(language) || !isLevel(level) || !isInterfaceLang(interface_language)) {
-      return NextResponse.json({ error: 'Invalid language or level' }, { status: 400 })
-    }
+    const parsed = await parseBody(request, EssayBody)
+    if (parsed.error) return parsed.error
+    const { content, topic, language, level, interface_language, is_bonus } = parsed.data
 
     const admin = await isAppAdmin(user.id)
     if (!admin) {
@@ -63,10 +54,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Daily essay limit reached', code: 'limit_reached' }, { status: 429 })
       }
     }
-    const safeTopic = sanitizePromptText(String(topic ?? ''), 200)
+    const safeTopic = sanitizePromptText(topic, 200)
 
-    const langName = getLearningLanguage(language).prompt.name
-    const uiLang = getInterfaceLanguage(interface_language).promptName
 
     let aiScore = 7
     let aiFeedback = ''
@@ -76,56 +65,22 @@ export async function POST(request: NextRequest) {
     let aiFunFact = ''
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
-
-      const prompt = `You are an encouraging language teacher reviewing a student's essay written in ${langName}.
-
-Student level: ${level}
-Essay topic: "${safeTopic}"
-Respond in: ${uiLang}
-
-Essay:
-"""
-${content}
-"""
-
-Return ONLY a valid JSON object, no markdown, no extra text:
-{
-  "score": <integer 1-10>,
-  "feedback": "<1-2 sentences of specific genuine praise about something concrete in this text>",
-  "improvements": [
-    {
-      "original": "<exact phrase from the essay>",
-      "better": "<corrected or improved version in ${langName}>",
-      "why": "<1 sentence explanation in ${uiLang}>"
-    }
-  ],
-  "alternatives": [
-    {
-      "phrase": "<phrase the student used>",
-      "options": ["<richer alternative in ${langName}>", "<another alternative>"]
-    }
-  ],
-  "fun_fact": "<one genuinely interesting or surprising fact about this topic or about ${langName}, in ${uiLang}>",
-  "words_used": ["list", "of", "${langName}", "words", "detected", "in", "the", "essay"]
-}
-
-Rules:
-- improvements: 1–3 items, only for real grammar or vocabulary mistakes. Empty array if no mistakes.
-- alternatives: 1–2 items showing richer ways to express what the student already wrote.
-- fun_fact: always include. Make it specific and engaging, not generic.`
-
-      const result = await model.generateContent(prompt)
-      const text = result.response.text().trim()
-      const jsonStr = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
-      const parsed = JSON.parse(jsonStr)
+      const parsed = await generateJson<{
+        score: number; feedback: string; words_used: string[]
+        improvements: typeof aiImprovements; alternatives: typeof aiAlternatives; fun_fact: string
+      }>(
+        AI_MODELS.essay,
+        essayPrompt({ language, interfaceLanguage: interface_language, level, topic: safeTopic, content }),
+        ESSAY_SCHEMA
+      )
       aiScore = Math.min(10, Math.max(1, Number(parsed.score) || 7))
       aiFeedback = String(parsed.feedback ?? '')
       wordsUsed = Array.isArray(parsed.words_used) ? parsed.words_used.map(String) : []
       aiImprovements = Array.isArray(parsed.improvements) ? parsed.improvements : []
       aiAlternatives = Array.isArray(parsed.alternatives) ? parsed.alternatives : []
       aiFunFact = String(parsed.fun_fact ?? '')
-    } catch {
+    } catch (err) {
+      console.error('[essay] AI error:', err)
       aiFeedback = getMessages(interface_language).server.essayFallbackFeedback
     }
 

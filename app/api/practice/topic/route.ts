@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import type { InterfaceLang, LearningLang } from '@/types/database'
-import { DEFAULT_INTERFACE_LANG, localized } from '@/lib/languages'
+import { localized } from '@/lib/languages'
 import { getMessages } from '@/locales'
-import { getWeekStart, isInterfaceLang, isLearningLang } from '@/lib/server/access'
+import { getWeekStart } from '@/lib/server/access'
+import { TopicQuery, parseQuery } from '@/lib/server/validation'
 
 function getISOWeek(date: Date): { week: number; year: number } {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
@@ -22,12 +22,9 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const searchParams = request.nextUrl.searchParams
-    const language = searchParams.get('language') as LearningLang
-    const interfaceLang = (searchParams.get('interface_lang') ?? DEFAULT_INTERFACE_LANG) as InterfaceLang
-
-    if (!isLearningLang(language)) return NextResponse.json({ error: 'Invalid language' }, { status: 400 })
-    const uiLang = isInterfaceLang(interfaceLang) ? interfaceLang : DEFAULT_INTERFACE_LANG
+    const parsed = parseQuery(request.nextUrl.searchParams, TopicQuery)
+    if (parsed.error) return parsed.error
+    const { language, interface_lang: uiLang } = parsed.data
 
     const today = new Date().toISOString().split('T')[0]
     const { week, year } = getISOWeek(new Date())

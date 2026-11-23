@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { DEFAULT_INTERFACE_LANG } from '@/lib/languages'
+import { TipsQuery, parseQuery } from '@/lib/server/validation'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,18 +9,14 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const searchParams = request.nextUrl.searchParams
-    const language = searchParams.get('language')
-    const level = searchParams.get('level')
-    const interfaceLang = searchParams.get('interface_lang') ?? DEFAULT_INTERFACE_LANG
-
-    if (!language || !level) {
-      return NextResponse.json({ error: 'language and level required' }, { status: 400 })
-    }
+    const parsed = parseQuery(request.nextUrl.searchParams, TipsQuery)
+    if (parsed.error) return parsed.error
+    const { language, level, interface_lang: interfaceLang } = parsed.data
 
     const { data: tips, error: tipsError } = await supabase
       .from('level_tips')
       .select('tip_text, sort_order')
+      .eq('language', language)
       .eq('level', level)
       .eq('interface_language', interfaceLang)
       .order('sort_order')

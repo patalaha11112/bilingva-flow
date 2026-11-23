@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getInterfaceLanguage, getLearningLanguage, localized } from "@/lib/languages";
-import {
-  LIMITS,
-  getWeekStart,
-  isAppAdmin,
-  isInterfaceLang,
-  isLearningLang,
-  isLevel,
-  isUuid,
-  sanitizePromptText,
-} from "@/lib/server/access";
+import { localized } from "@/lib/languages";
+import { AI_MODELS, generateJson } from "@/lib/server/ai";
+import { SENTENCES_SCHEMA, sentencesPrompt } from "@/lib/server/prompts";
+import { LIMITS, getWeekStart, isAppAdmin, sanitizePromptText } from "@/lib/server/access";
+import { SentencesBody, parseBody } from "@/lib/server/validation";
 import type {
   LearningLang,
   Level,
@@ -20,7 +13,6 @@ import type {
   GeneratedSentence,
 } from "@/types/database";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 const SENTENCE_FIELDS =
   "id, sentence_text, translation, topic_id, custom_topic, language, interface_language, sentence_parts(*)";
@@ -63,6 +55,9 @@ async function linkSentences(supabase: any, userId: string, language: LearningLa
   if (error) console.error("[sentences] link error:", error.message);
 }
 
+// AI generation takes 10–25 s; allow for a slow primary model plus the fallback
+export const maxDuration = 120
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -77,23 +72,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { language, level, topic_id, custom_topic, interface_language, refresh, add_count } =
-      (await request.json()) as {
-        language: LearningLang;
-        level: Level;
-        topic_id?: string;
-        custom_topic?: string;
-        interface_language: InterfaceLang;
-        refresh?: boolean;
-        add_count?: number;
-      };
-
-    if (!isLearningLang(language) || !isLevel(level) || !isInterfaceLang(interface_language)) {
-      return NextResponse.json({ error: "Invalid language or level" }, { status: 400 });
-    }
-    if (topic_id != null && !isUuid(topic_id)) {
-      return NextResponse.json({ error: "Invalid topic" }, { status: 400 });
-    }
+    const parsed = await parseBody(request, SentencesBody);
+    if (parsed.error) return parsed.error;
+    const { language, level, topic_id, custom_topic, interface_language, refresh, add_count } = parsed.data;
 
     const weekStart = getWeekStart();
     const admin = await isAppAdmin(user.id);
@@ -123,7 +104,7 @@ export async function POST(request: NextRequest) {
       const { count: activeCount } = await activeThisWeek(
         supabase, user.id, language, interface_language, weekStart, "id", { count: "exact", head: true }
       );
-      const requested = admin ? Math.min(Math.max(1, Math.floor(Number(add_count)) || 1), 20) : 1;
+      const requested = admin ? Math.min(add_count, 20) : 1;
       const count = Math.min(requested, remaining, maxActive - (activeCount ?? 0));
       if (count <= 0) return limitReached();
 
@@ -401,113 +382,27 @@ async function getNewSentences(
 }
 
 // ─────────────────────────────────────────
-// Gemini generation
+// AI generation
 // ─────────────────────────────────────────
-async function generateSentences({
-  language,
-  level,
-  topicName,
-  interfaceLanguage,
-  count,
-}: {
+async function generateSentences(params: {
   language: LearningLang;
   level: Level;
   topicName: string;
   interfaceLanguage: InterfaceLang;
   count: number;
 }): Promise<GeneratedSentence[]> {
-  const learning = getLearningLanguage(language).prompt;
-  const langName = learning.name;
-  const uiLang = getInterfaceLanguage(interfaceLanguage).promptName;
-  const explanationRules = learning.explanationRules
-    .map((rule) => `- ${rule.replaceAll("{ui}", uiLang)}`)
-    .join("\n");
-  const topic = topicName || "general everyday life";
-
-  const prompt = `You are an expert language teacher creating structured learning materials.
-
-Generate exactly ${count} ${langName} sentence${count > 1 ? "s" : ""} for a student at level ${level}.
-Topic: "${topic}"
-${count > 1 ? `
-## Story Rules
-These ${count} sentences must form a connected mini-story about the topic.
-- They should flow naturally one into the next (beginning → middle → end)
-- Use consistent characters, places, or objects across sentences
-- Together they should describe one real-life situation from start to finish
-- The story should feel natural, not forced — like something that actually happens
-` : ""}
-## Sentence Rules
-- Match level ${level} exactly in vocabulary and grammar complexity
-- Sentences must be natural and useful in real life situations
-- Vary sentence structures (statements, questions, negations — mix them)
-- Prefer practical, everyday vocabulary over abstract or literary words
-- Each sentence must cover a different grammar pattern or vocabulary area
-
-## Splitting Rules
-Split each sentence into 2–5 parts by grammatical units:
-- subject or subject phrase
-- verb phrase (verb + auxiliary if any)
-- object or complement
-- adverbial (time, place, manner)
-Do NOT split single words unless the word itself is the entire meaningful unit.
-
-## Pronunciation Rules
-- Write pronunciation as it sounds to a native ${uiLang} speaker
-- Mark stress with CAPITAL letter on the stressed syllable
-- Example: ${learning.pronunciationExample}
-- Avoid English-based approximations — use only sounds natural in ${uiLang}
-
-## Explanation Rules
-For each part write a short, encouraging explanation in ${uiLang} (1–2 sentences max):
-${explanationRules}
-- Do NOT state obvious things if the translation already says so
-
-## Tip Rules
-Add a "tip" field ONLY for: irregular forms, false friends, or tricky pronunciation.
-Omit "tip" entirely when there is nothing non-obvious to say.
-
-## Output Format
-Return ONLY a valid JSON array. No markdown, no explanation, no extra text.
-
-[
-  {
-    "sentence_text": "full sentence in ${langName}",
-    "translation": "translation in ${uiLang}",
-    "parts": [
-      {
-        "text": "part of sentence",
-        "translation": "translation of this part in ${uiLang}",
-        "pronunciation": "stress marked with CAPITAL letters",
-        "explanation": "grammar note in ${uiLang}",
-        "tip": "only if non-obvious — omit otherwise"
-      }
-    ]
-  }
-]`;
-
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-
-    const clean = text
-      .replace(/```json\n?/g, "")
-      .replace(/```\n?/g, "")
-      .trim();
-
-    const parsed = JSON.parse(clean) as GeneratedSentence[];
-
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed.filter(
-      (s) =>
-        s.sentence_text &&
-        s.translation &&
-        Array.isArray(s.parts) &&
-        s.parts.length > 0,
+    const parsed = await generateJson<GeneratedSentence[]>(
+      AI_MODELS.sentences,
+      sentencesPrompt(params),
+      SENTENCES_SCHEMA
     );
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((s) => s.sentence_text && s.translation && Array.isArray(s.parts) && s.parts.length > 0)
+      .slice(0, params.count);
   } catch (err) {
-    console.error("Gemini error:", err);
+    console.error("[sentences] AI error:", err);
     return [];
   }
 }

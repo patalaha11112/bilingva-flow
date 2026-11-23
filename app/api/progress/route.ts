@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import type { LearningLang } from "@/types/database";
+import { ProgressBody, parseBody } from "@/lib/server/validation";
 
 /**
  * Saves which parts of a sentence the user understands.
@@ -14,15 +14,9 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { sentence_id, understood_parts, language } = (await request.json()) as {
-      sentence_id: string;
-      understood_parts: string[];
-      language: LearningLang;
-    };
-
-    if (!sentence_id || !Array.isArray(understood_parts)) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
+    const parsed = await parseBody(request, ProgressBody);
+    if (parsed.error) return parsed.error;
+    const { sentence_id, understood_parts, language } = parsed.data;
 
     const { data: partsData } = await supabase
       .from("sentence_parts")

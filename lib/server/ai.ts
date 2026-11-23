@@ -1,0 +1,57 @@
+import { GoogleGenAI, ThinkingLevel } from '@google/genai'
+
+// ============================================
+// Gemini access for all AI tasks.
+//
+// Each task has a primary model and a fallback, used when the primary is
+// overloaded (503), out of quota (429) or too slow. The primary can be
+// overridden with env vars (e.g. in Vercel) to try another model without a
+// code change.
+//
+// Chosen 2026-11-23 by running the real sentence prompt on every model the
+// API key can use: gemini-4-hydrogen gave correct Cyrillic pronunciation,
+// relevant tips and accurate grammar notes; gemini-2.5-flash-lite is faster but
+// makes stress and transcription mistakes. gemini-4-argon/carbon/neon are not
+// available on the current (free) tier.
+// ============================================
+
+const FALLBACK_MODEL = 'gemini-2.5-flash-lite'
+
+export const AI_MODELS = {
+  sentences: process.env.GEMINI_MODEL_SENTENCES || 'gemini-4-hydrogen',
+  essay: process.env.GEMINI_MODEL_ESSAY || 'gemini-4-hydrogen',
+} as const
+
+const TIMEOUT_MS = 60_000
+
+let client: GoogleGenAI | null = null
+// JSON mode (responseJsonSchema) is only available on v1beta
+const ai = () => (client ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY!, apiVersion: 'v1beta' }))
+
+async function callModel(model: string, prompt: string, schema: object): Promise<string> {
+  const res = await ai().models.generateContent({
+    model,
+    contents: prompt,
+    config: {
+      // httpOptions.timeout is not enforced by the SDK; an abort signal is
+      abortSignal: AbortSignal.timeout(TIMEOUT_MS),
+      responseMimeType: 'application/json',
+      responseJsonSchema: schema,
+      // Short structured tasks: deep reasoning only adds latency and cost.
+      // Gemini 2.x models don't accept thinkingLevel.
+      ...(model.startsWith('gemini-2.') ? {} : { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
+    },
+  })
+  return res.text ?? ''
+}
+
+/** Runs a prompt and returns the JSON response, shaped by `schema`; falls back to a lighter model on failure */
+export async function generateJson<T>(model: string, prompt: string, schema: object): Promise<T> {
+  try {
+    return JSON.parse(await callModel(model, prompt, schema)) as T
+  } catch (err) {
+    if (model === FALLBACK_MODEL) throw err
+    console.error(`[ai] ${model} failed, falling back to ${FALLBACK_MODEL}:`, err instanceof Error ? err.message : err)
+    return JSON.parse(await callModel(FALLBACK_MODEL, prompt, schema)) as T
+  }
+}

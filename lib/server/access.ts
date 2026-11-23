@@ -1,7 +1,4 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { INTERFACE_LANG_CODES, LEARNING_LANG_CODES } from '@/lib/languages'
-import { LEVELS } from '@/core/constants'
-import type { InterfaceLang, LearningLang, Level } from '@/types/database'
 
 // ============================================
 // Limits on AI usage for regular users. Admins (rows in public.app_admins)
@@ -34,18 +31,6 @@ export async function isAppAdmin(userId: string): Promise<boolean> {
   }
   return !!data
 }
-
-export const isLearningLang = (v: unknown): v is LearningLang =>
-  typeof v === 'string' && (LEARNING_LANG_CODES as string[]).includes(v)
-
-export const isInterfaceLang = (v: unknown): v is InterfaceLang =>
-  typeof v === 'string' && (INTERFACE_LANG_CODES as string[]).includes(v)
-
-export const isLevel = (v: unknown): v is Level =>
-  typeof v === 'string' && (LEVELS as readonly string[]).includes(v)
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-export const isUuid = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v)
 
 /** Strips characters that could break out of a quoted prompt value */
 export function sanitizePromptText(text: string, maxChars: number): string {
