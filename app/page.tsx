@@ -60,6 +60,18 @@ export default function Home() {
 
       <TodayPlan />
 
+
+      {/* Week rings */}
+      <section className="rounded-2xl bg-card p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            {t.home.weekActivity}
+          </h2>
+          <ActivityArchive userId={profile.id} />
+        </div>
+        <WeekProgress activity={weekActivity} />
+      </section>
+
       {/* Alphabet */}
       {getLearningLanguage(learningLang).hasAlphabet && (
         <Link
@@ -76,17 +88,6 @@ export default function Home() {
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </Link>
       )}
-
-      {/* Week rings */}
-      <section className="rounded-2xl bg-card p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium text-muted-foreground">
-            {t.home.weekActivity}
-          </h2>
-          <ActivityArchive userId={profile.id} />
-        </div>
-        <WeekProgress activity={weekActivity} />
-      </section>
 
       {/* Tip of the day */}
       {tip && (
