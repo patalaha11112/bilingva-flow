@@ -12,14 +12,31 @@ import type {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-// Получить номер ISO-недели
-function getISOWeek(date: Date): { week: number; year: number } {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+// Start of the current ISO week (Monday 00:00 UTC). A sentence belongs to the
+// week in which it was first shown (user_sentences.first_seen_at).
+function getWeekStart(date: Date = new Date()): string {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return { week, year: d.getUTCFullYear() };
+  d.setUTCDate(d.getUTCDate() - (dayNum - 1));
+  return d.toISOString();
+}
+
+const SENTENCE_FIELDS =
+  "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)";
+
+/** Links new sentences to the user as part of the current week's active set */
+async function linkSentences(supabaseAdmin: any, userId: string, language: LearningLang, sentenceIds: string[]) {
+  if (sentenceIds.length === 0) return;
+  const { error } = await supabaseAdmin.from("user_sentences").insert(
+    sentenceIds.map((sentence_id) => ({
+      user_id: userId,
+      sentence_id,
+      language,
+      understood_parts: [],
+      is_active: true,
+    }))
+  );
+  if (error) console.error("[sentences] link error:", error.message);
 }
 
 export async function POST(request: NextRequest) {
@@ -46,7 +63,7 @@ export async function POST(request: NextRequest) {
         add_count?: number;
       };
 
-    const { week: currentWeek, year: currentYear } = getISOWeek(new Date());
+    const weekStart = getWeekStart();
 
     // ─────────────────────────────────────────
     // ADD 1: add exactly N new sentences
@@ -64,30 +81,14 @@ export async function POST(request: NextRequest) {
         add_count
       );
 
-      for (const s of newSentences) {
-        await supabaseAdmin.from("user_sentences").insert({
-          user_id: user.id,
-          sentence_id: s.id,
-          language,
-          understood_parts: [],
-          all_understood: false,
-          times_shown: 0,
-          last_shown_at: null,
-          fully_mastered: false,
-          first_seen_at: new Date().toISOString(),
-          is_active: true,
-          week_number: currentWeek,
-          year: currentYear,
-        });
-      }
+      await linkSentences(supabaseAdmin, user.id, language, newSentences.map((s: any) => s.id));
 
       const { data: allActive } = await supabaseAdmin
         .from("user_sentences")
         .select("id")
         .eq("user_id", user.id)
         .eq("language", language)
-        .eq("week_number", currentWeek)
-        .eq("year", currentYear)
+        .gte("first_seen_at", weekStart)
         .eq("is_active", true);
 
       const addIds = newSentences.map((s: any) => s.id)
@@ -104,93 +105,52 @@ export async function POST(request: NextRequest) {
     // 1. Get active sentences for this week
     // ─────────────────────────────────────────
     if (!refresh) {
-      const { data: activeSentences } = await supabaseAdmin
+      const { data: activeRows, error: activeError } = await supabaseAdmin
         .from("user_sentences")
         .select("sentence_id")
         .eq("user_id", user.id)
         .eq("language", language)
-        .eq("week_number", currentWeek)
-        .eq("year", currentYear)
-        .eq("is_active", true);
+        .gte("first_seen_at", weekStart)
+        .eq("is_active", true)
+        .order("first_seen_at", { ascending: true });
+      if (activeError) console.error("[sentences] active fetch error:", activeError.message);
 
-      const activeSentenceIds = (activeSentences ?? []).map((r) => r.sentence_id);
+      const activeSentenceIds: string[] = (activeRows ?? []).map((r: any) => r.sentence_id);
 
-      // If we have 5 active sentences, return them
-      if (activeSentenceIds.length >= 5) {
-        const { data: sentencesData } = await supabaseAdmin
-          .from("sentences")
-          .select(
-            "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
-          )
-          .in("id", activeSentenceIds.slice(0, 5));
-
-        const userProgress = await fetchUserProgress(supabaseAdmin, user.id, activeSentenceIds.slice(0, 5))
-        return NextResponse.json({
-          sentences: sentencesData ?? [],
-          generated: false,
-          weeklyLimit: {
-            total: activeSentences?.length ?? 0,
-            max: 10,
-          },
-          userProgress,
-        });
-      }
-
-      // If we have less than 5, load them and fill up to 5
+      // All of this week's sentences, in the order they were added
       let existingSentences: any[] = [];
       if (activeSentenceIds.length > 0) {
         const { data } = await supabaseAdmin
           .from("sentences")
-          .select(
-            "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
-          )
+          .select(SENTENCE_FIELDS)
           .in("id", activeSentenceIds);
-        existingSentences = data ?? [];
+        const byId = new Map((data ?? []).map((s: any) => [s.id, s]));
+        existingSentences = activeSentenceIds.map((id) => byId.get(id)).filter(Boolean);
       }
 
-      const needed = 5 - existingSentences.length;
-
-      // Get new sentences
-      const newSentences = await getNewSentences(
-        supabase,
-        supabaseAdmin,
-        user.id,
-        language,
-        level,
-        topic_id,
-        custom_topic,
-        interface_language,
-        needed
-      );
-
-      // Save new sentences to user_sentences with current week info
-      for (const s of newSentences) {
-        await supabaseAdmin.from("user_sentences").insert({
-          user_id: user.id,
-          sentence_id: s.id,
-          language,
-          understood_parts: [],
-          all_understood: false,
-          times_shown: 0,
-          last_shown_at: null,
-          fully_mastered: false,
-          first_seen_at: new Date().toISOString(),
-          is_active: true,
-          week_number: currentWeek,
-          year: currentYear,
-        });
-      }
+      // Fill the week up to 5 sentences
+      const needed = Math.max(0, 5 - existingSentences.length);
+      const newSentences = needed > 0
+        ? await getNewSentences(
+            supabase,
+            supabaseAdmin,
+            user.id,
+            language,
+            level,
+            topic_id,
+            custom_topic,
+            interface_language,
+            needed
+          )
+        : [];
+      await linkSentences(supabaseAdmin, user.id, language, newSentences.map((s: any) => s.id));
 
       const totalSentences = [...existingSentences, ...newSentences];
-      const totalIds = totalSentences.map((s: any) => s.id)
-      const userProgress = await fetchUserProgress(supabaseAdmin, user.id, totalIds)
+      const userProgress = await fetchUserProgress(supabaseAdmin, user.id, totalSentences.map((s: any) => s.id));
       return NextResponse.json({
         sentences: totalSentences,
         generated: newSentences.length > 0,
-        weeklyLimit: {
-          total: activeSentenceIds.length + newSentences.length,
-          max: 10,
-        },
+        weeklyLimit: { total: totalSentences.length, max: 10 },
         userProgress,
       });
     }
@@ -204,8 +164,7 @@ export async function POST(request: NextRequest) {
         .select("id")
         .eq("user_id", user.id)
         .eq("language", language)
-        .eq("week_number", currentWeek)
-        .eq("year", currentYear)
+        .gte("first_seen_at", weekStart)
         .eq("is_active", true);
 
       // Get 5 new sentences first, so a generation failure leaves the current set intact
@@ -230,22 +189,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Save with current week info
-      for (const s of newSentences) {
-        await supabaseAdmin.from("user_sentences").insert({
-          user_id: user.id,
-          sentence_id: s.id,
-          language,
-          understood_parts: [],
-          all_understood: false,
-          times_shown: 0,
-          last_shown_at: null,
-          fully_mastered: false,
-          first_seen_at: new Date().toISOString(),
-          is_active: true,
-          week_number: currentWeek,
-          year: currentYear,
-        });
-      }
+      await linkSentences(supabaseAdmin, user.id, language, newSentences.map((s: any) => s.id));
 
       const refreshIds = newSentences.map((s: any) => s.id)
       const userProgress = await fetchUserProgress(supabaseAdmin, user.id, refreshIds)
@@ -319,9 +263,7 @@ async function getNewSentences(
   // Query available sentences
   let query = supabaseAdmin
     .from("sentences")
-    .select(
-      "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)"
-    )
+    .select(SENTENCE_FIELDS)
     .eq("language", language)
     .eq("level", level);
 

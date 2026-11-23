@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type {
   SentenceWithParts,
   UserSentence,
@@ -126,63 +126,56 @@ export function useSentences({
     fetchSentences()
   }, [fetchSentences])
 
-  const markPartUnderstood = async (sentenceId: string, partId: string) => {
-    // Optimistic update — toggle immediately so the UI responds on click
-    setUserProgress(prev => {
-      const current = prev[sentenceId]
-      const currentParts: string[] = (current?.understood_parts as string[]) ?? []
-      const newParts = currentParts.includes(partId)
-        ? currentParts.filter(id => id !== partId)
-        : [...currentParts, partId]
-      return {
-        ...prev,
-        [sentenceId]: { ...(current ?? {}), understood_parts: newParts, sentence_id: sentenceId } as UserSentence,
+  // Latest progress for computing toggles, and a queue so saves reach the server in click order
+  const progressRef = useRef(userProgress)
+  progressRef.current = userProgress
+  const saveQueue = useRef<Promise<void>>(Promise.resolve())
+
+  const setUnderstoodParts = (sentenceId: string, parts: string[], allUnderstood: boolean) => {
+    const updated = {
+      ...progressRef.current,
+      [sentenceId]: {
+        ...(progressRef.current[sentenceId] ?? {}),
+        sentence_id: sentenceId,
+        understood_parts: parts,
+        all_understood: allUnderstood,
+      } as UserSentence,
+    }
+    progressRef.current = updated
+    setUserProgress(updated)
+
+    saveQueue.current = saveQueue.current.then(async () => {
+      try {
+        const res = await fetch('/api/progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sentence_id: sentenceId, understood_parts: parts, language }),
+        })
+        if (!res.ok) console.error('save progress:', res.status, await res.text())
+      } catch (err) {
+        console.error('save progress:', err)
       }
     })
-
-    // Persist in background; on success sync the authoritative state from server
-    try {
-      const res = await fetch('/api/progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sentence_id: sentenceId, part_id: partId, language }),
-      })
-      if (!res.ok) return
-      const data = await res.json() as { progress: UserSentence }
-      if (data.progress) {
-        setUserProgress(prev => ({ ...prev, [sentenceId]: data.progress }))
-      }
-    } catch { /* optimistic state stays */ }
+    return saveQueue.current
   }
 
-  const markAllUnderstood = async (sentenceId: string) => {
-    const sentence = sentences.find(s => s.id === sentenceId)
-    const allPartIds = (sentence?.sentence_parts ?? []).map(p => p.id)
+  const partIdsOf = (sentenceId: string) =>
+    (sentences.find(s => s.id === sentenceId)?.sentence_parts ?? []).map(p => p.id)
 
-    // Optimistic toggle
-    setUserProgress(prev => {
-      const current = prev[sentenceId]
-      const currentParts: string[] = (current?.understood_parts as string[]) ?? []
-      const isAll = allPartIds.length > 0 && currentParts.length >= allPartIds.length
-      const newParts = isAll ? [] : allPartIds
-      return {
-        ...prev,
-        [sentenceId]: { ...(current ?? {}), understood_parts: newParts, all_understood: !isAll, sentence_id: sentenceId } as UserSentence,
-      }
-    })
+  const markPartUnderstood = (sentenceId: string, partId: string) => {
+    const allPartIds = partIdsOf(sentenceId)
+    const current = progressRef.current[sentenceId]?.understood_parts ?? []
+    const parts = current.includes(partId)
+      ? current.filter(id => id !== partId)
+      : [...current, partId]
+    return setUnderstoodParts(sentenceId, parts, allPartIds.length > 0 && parts.length >= allPartIds.length)
+  }
 
-    try {
-      const res = await fetch('/api/progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sentence_id: sentenceId, mark_all: true, language }),
-      })
-      if (!res.ok) return
-      const data = await res.json() as { progress: UserSentence }
-      if (data.progress) {
-        setUserProgress(prev => ({ ...prev, [sentenceId]: data.progress }))
-      }
-    } catch { /* optimistic state stays */ }
+  const markAllUnderstood = (sentenceId: string) => {
+    const allPartIds = partIdsOf(sentenceId)
+    const current = progressRef.current[sentenceId]?.understood_parts ?? []
+    const isAll = allPartIds.length > 0 && current.length >= allPartIds.length
+    return setUnderstoodParts(sentenceId, isAll ? [] : allPartIds, !isAll)
   }
 
   // Next sentence in training mode

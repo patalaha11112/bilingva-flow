@@ -19,6 +19,13 @@ const FALLBACK_TOPICS: Record<InterfaceLang, string[]> = {
   es: ['Mi día típico', 'Mis pasatiempos', 'Mi familia', 'Comida que amo', 'Mi lugar favorito'],
 }
 
+// Monday 00:00 UTC of the current week (user_sentences has no week columns)
+function getWeekStart(date: Date = new Date()): string {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() || 7) - 1))
+  return d.toISOString()
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -55,8 +62,7 @@ export async function GET(request: NextRequest) {
       .select('sentence_id')
       .eq('user_id', user.id)
       .eq('language', language)
-      .eq('week_number', week)
-      .eq('year', year)
+      .gte('first_seen_at', getWeekStart())
       .limit(50)
 
     if (userSentences && userSentences.length > 0) {
