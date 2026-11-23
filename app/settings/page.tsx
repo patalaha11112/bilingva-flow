@@ -20,18 +20,14 @@ import {
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import {
+  INTERFACE_LANGUAGES,
+  INTERFACE_LANG_CODES,
+  LEARNING_LANGUAGES,
+  LEARNING_LANG_CODES,
+} from '@/lib/languages'
 import type { InterfaceLang, LearningLang, Level } from '@/types/database'
 
-const INTERFACE_LANGS: { value: InterfaceLang; label: string; flag: string }[] = [
-  { value: 'ru', label: 'Русский', flag: '🇷🇺' },
-  { value: 'en', label: 'English', flag: '🇺🇸' },
-  { value: 'es', label: 'Español', flag: '🇪🇸' },
-]
-
-const LEARNING_LANGS: { value: LearningLang; flag: string; labelKey: 'lang_es' | 'lang_en' }[] = [
-  { value: 'es', flag: '🇪🇸', labelKey: 'lang_es' },
-  { value: 'en', flag: '🇺🇸', labelKey: 'lang_en' },
-]
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -67,12 +63,7 @@ export default function SettingsPage() {
   const level: Level = activeLanguage?.level ?? 'A1'
   const learningLang: LearningLang = activeLanguage?.learning_language ?? 'es'
 
-  const getLevelDescription = (lvl: Level) => {
-    const desc = LEVEL_DESCRIPTIONS[lvl]
-    if (lang === 'ru') return desc.ru
-    if (lang === 'es') return desc.es
-    return desc.en
-  }
+  const getLevelDescription = (lvl: Level) => LEVEL_DESCRIPTIONS[lvl][lang]
 
   if (isLoading) {
     return (
@@ -97,14 +88,14 @@ export default function SettingsPage() {
         <section className="rounded-2xl bg-card shadow-sm p-4 space-y-3">
           <p className="text-sm font-medium">{t('interfaceLanguage', lang)}</p>
           <div className="flex gap-2">
-            {INTERFACE_LANGS.map(({ value, label, flag }) => (
+            {INTERFACE_LANG_CODES.map((value) => (
               <OptionChip
                 key={value}
                 selected={lang === value}
                 onClick={() => updateProfile({ interface_language: value })}
               >
-                <span>{flag}</span>
-                <span>{label}</span>
+                <span>{INTERFACE_LANGUAGES[value].flag}</span>
+                <span>{INTERFACE_LANGUAGES[value].nativeName}</span>
               </OptionChip>
             ))}
           </div>
@@ -114,14 +105,14 @@ export default function SettingsPage() {
         <section className="rounded-2xl bg-card shadow-sm p-4 space-y-3">
           <p className="text-sm font-medium">{t('learningLanguage', lang)}</p>
           <div className="flex gap-2">
-            {LEARNING_LANGS.map(({ value, flag, labelKey }) => (
+            {LEARNING_LANG_CODES.map((value) => (
               <OptionChip
                 key={value}
                 selected={learningLang === value}
                 onClick={() => setActiveLanguage(value)}
               >
-                <span>{flag}</span>
-                <span>{t(labelKey, lang)}</span>
+                <span>{LEARNING_LANGUAGES[value].flag}</span>
+                <span>{LEARNING_LANGUAGES[value].name[lang]}</span>
               </OptionChip>
             ))}
           </div>

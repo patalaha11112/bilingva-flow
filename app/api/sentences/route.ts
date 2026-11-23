@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getInterfaceLanguage, getLearningLanguage } from "@/lib/languages";
 import type {
   LearningLang,
   Level,
@@ -431,14 +432,12 @@ async function generateSentences({
   interfaceLanguage: InterfaceLang;
   count: number;
 }): Promise<GeneratedSentence[]> {
-  const langName =
-    language === "es" ? "Spanish (Castilian, Spain)" : "English (American)";
-  const uiLang =
-    interfaceLanguage === "ru"
-      ? "Russian"
-      : interfaceLanguage === "es"
-        ? "Spanish"
-        : "English";
+  const learning = getLearningLanguage(language).prompt;
+  const langName = learning.name;
+  const uiLang = getInterfaceLanguage(interfaceLanguage).promptName;
+  const explanationRules = learning.explanationRules
+    .map((rule) => `- ${rule.replaceAll("{ui}", uiLang)}`)
+    .join("\n");
   const topic = topicName || "general everyday life";
 
   const prompt = `You are an expert language teacher creating structured learning materials.
@@ -471,14 +470,12 @@ Do NOT split single words unless the word itself is the entire meaningful unit.
 ## Pronunciation Rules
 - Write pronunciation as it sounds to a native ${uiLang} speaker
 - Mark stress with CAPITAL letter on the stressed syllable
-- Example: "nosotros hablamos" → "nosOtros abLAmos"
+- Example: ${learning.pronunciationExample}
 - Avoid English-based approximations — use only sounds natural in ${uiLang}
 
 ## Explanation Rules
 For each part write a short, encouraging explanation in ${uiLang} (1–2 sentences max):
-- Verbs: mention infinitive form + what conjugation this is
-- Nouns: mention grammatical gender (el/la) + note if similar to a ${uiLang} word
-- Prepositions and connectors: explain the usage pattern, not just the meaning
+${explanationRules}
 - Do NOT state obvious things if the translation already says so
 
 ## Tip Rules

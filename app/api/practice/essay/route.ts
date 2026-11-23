@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { InterfaceLang, LearningLang, Level } from '@/types/database'
+import { getInterfaceLanguage, getLearningLanguage } from '@/lib/languages'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
@@ -40,10 +41,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 })
     }
 
-    const langName = language === 'es' ? 'Spanish' : 'English'
-    const uiLang = interface_language === 'ru' ? 'Russian'
-                 : interface_language === 'es' ? 'Spanish'
-                 : 'English'
+    const langName = getLearningLanguage(language).prompt.name
+    const uiLang = getInterfaceLanguage(interface_language).promptName
 
     let aiScore = 7
     let aiFeedback = ''

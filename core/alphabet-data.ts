@@ -1,6 +1,6 @@
-import type { LearningLanguage, InterfaceLanguage } from './types'
+import type { InterfaceLang, LearningLang } from '@/lib/languages'
 
-type L10n = Record<InterfaceLanguage, string>
+type L10n = Record<InterfaceLang, string>
 
 export interface Example {
   word: string
@@ -693,27 +693,31 @@ export const ENGLISH_DIGRAPHS: Digraph[] = [
   },
 ]
 
-export function getAlphabetData(learningLanguage: LearningLanguage) {
-  if (learningLanguage === 'spanish') {
-    return {
-      letters: SPANISH_LETTERS,
-      digraphs: SPANISH_DIGRAPHS,
-      flag: '🇪🇸',
-      title: { ru: 'Испанский алфавит', en: 'Spanish Alphabet', es: 'Alfabeto español' },
-      subtitle: { ru: '27 букв', en: '27 letters', es: '27 letras' },
-      digraphNote: {
-        ru: 'Две буквы — один звук. CH и LL считались отдельными буквами до 2010 года',
-        en: 'Two letters, one sound. CH and LL counted as separate letters until 2010',
-        es: 'Dos letras, un sonido. CH y LL se consideraron letras hasta 2010',
-      },
-      langCode: 'es-ES',
-    }
-  }
+export interface AlphabetData {
+  letters: Letter[]
+  digraphs: Digraph[]
+  title: L10n
+  subtitle: L10n
+  digraphNote: L10n
+}
 
-  return {
+// Learning languages without an entry here have no alphabet page;
+// keep hasAlphabet in lib/languages.ts in sync
+const ALPHABETS: Partial<Record<LearningLang, AlphabetData>> = {
+  es: {
+    letters: SPANISH_LETTERS,
+    digraphs: SPANISH_DIGRAPHS,
+    title: { ru: 'Испанский алфавит', en: 'Spanish Alphabet', es: 'Alfabeto español' },
+    subtitle: { ru: '27 букв', en: '27 letters', es: '27 letras' },
+    digraphNote: {
+      ru: 'Две буквы — один звук. CH и LL считались отдельными буквами до 2010 года',
+      en: 'Two letters, one sound. CH and LL counted as separate letters until 2010',
+      es: 'Dos letras, un sonido. CH y LL se consideraron letras hasta 2010',
+    },
+  },
+  en: {
     letters: ENGLISH_LETTERS,
     digraphs: ENGLISH_DIGRAPHS,
-    flag: '🇬🇧',
     title: { ru: 'Английский алфавит', en: 'English Alphabet', es: 'Alfabeto inglés' },
     subtitle: { ru: '26 букв', en: '26 letters', es: '26 letras' },
     digraphNote: {
@@ -721,6 +725,9 @@ export function getAlphabetData(learningLanguage: LearningLanguage) {
       en: 'Important letter combinations',
       es: 'Combinaciones importantes',
     },
-    langCode: 'en-US',
-  }
+  },
+}
+
+export function getAlphabetData(language: LearningLang): AlphabetData | null {
+  return ALPHABETS[language] ?? null
 }

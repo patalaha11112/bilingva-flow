@@ -6,6 +6,7 @@ import { Home, BookA, MessageSquareText, Mic2, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/hooks/use-user'
 import { t } from '@/lib/i18n'
+import { DEFAULT_LEARNING_LANG, getLearningLanguage } from '@/lib/languages'
 
 const navItems = [
   { href: '/', icon: Home, key: 'home' as const },
@@ -17,8 +18,10 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname()
-  const { profile } = useUser()
+  const { profile, activeLanguage } = useUser()
   const lang = profile?.interface_language ?? 'ru'
+  const learningLang = activeLanguage?.learning_language ?? DEFAULT_LEARNING_LANG
+  const items = navItems.filter(({ href }) => href !== '/alphabet' || getLearningLanguage(learningLang).hasAlphabet)
 
   const hidden = ['/login', '/register'].includes(pathname)
   if (hidden) return null
@@ -26,7 +29,7 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/80 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-lg items-center justify-around px-2">
-        {navItems.map(({ href, icon: Icon, key }) => {
+        {items.map(({ href, icon: Icon, key }) => {
           const isActive = pathname === href
           return (
             <Link

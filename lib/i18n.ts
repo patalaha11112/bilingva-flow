@@ -17,14 +17,11 @@ export type TranslationKey =
   | 'yourLevel' | 'learningLanguage' | 'change'
   // Common
   | 'loading' | 'error_loading' | 'comingSoon'
-  // Languages
-  | 'lang_es' | 'lang_en'
   // Settings
   | 'settings' | 'settingsTitle' | 'interfaceLanguage' | 'level'
   | 'save' | 'cancel' | 'confirm' | 'reset' | 'resetProgress'
   | 'resetConfirmTitle' | 'resetConfirmMessage'
   | 'interests' | 'sentencesPerWeek'
-  | 'spanish' | 'english'
   | 'theme' | 'themeLight' | 'themeDark' | 'logout'
   // Practice / Essay
   | 'essayTitle' | 'essayBonusLabel' | 'essayTopic' | 'essaySuggestedWords'
@@ -61,8 +58,6 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     loading: 'Загрузка...',
     error_loading: 'Ошибка загрузки',
     comingSoon: 'Скоро',
-    lang_es: 'Испанский',
-    lang_en: 'Английский',
     settings: 'Настройки',
     settingsTitle: 'Настройки',
     interfaceLanguage: 'Язык интерфейса',
@@ -76,8 +71,6 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     resetConfirmMessage: 'Все данные будут удалены. Это действие нельзя отменить.',
     interests: 'Интересы',
     sentencesPerWeek: 'Предложений в неделю',
-    spanish: 'Испанский',
-    english: 'Английский',
     theme: 'Тема',
     themeLight: 'Светлая',
     themeDark: 'Тёмная',
@@ -124,8 +117,6 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     loading: 'Loading...',
     error_loading: 'Failed to load',
     comingSoon: 'Coming Soon',
-    lang_es: 'Spanish',
-    lang_en: 'English',
     settings: 'Settings',
     settingsTitle: 'Settings',
     interfaceLanguage: 'Interface Language',
@@ -139,8 +130,6 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     resetConfirmMessage: 'All data will be deleted. This cannot be undone.',
     interests: 'Interests',
     sentencesPerWeek: 'Sentences per week',
-    spanish: 'Spanish',
-    english: 'English',
     theme: 'Theme',
     themeLight: 'Light',
     themeDark: 'Dark',
@@ -187,8 +176,6 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     loading: 'Cargando...',
     error_loading: 'Error al cargar',
     comingSoon: 'Próximamente',
-    lang_es: 'Español',
-    lang_en: 'Inglés',
     settings: 'Ajustes',
     settingsTitle: 'Ajustes',
     interfaceLanguage: 'Idioma de interfaz',
@@ -202,8 +189,6 @@ const translations: Record<InterfaceLang, Record<TranslationKey, string>> = {
     resetConfirmMessage: 'Todos los datos serán eliminados. Esta acción no se puede deshacer.',
     interests: 'Intereses',
     sentencesPerWeek: 'Oraciones por semana',
-    spanish: 'Español',
-    english: 'Inglés',
     theme: 'Tema',
     themeLight: 'Claro',
     themeDark: 'Oscuro',

@@ -7,6 +7,8 @@ import { useUser } from '@/hooks/use-user'
 import { useSentences } from '@/hooks/use-sentences'
 import { t } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { getLearningLanguage, type LearningLang } from '@/lib/languages'
+import { speak } from '@/lib/speech'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { SentenceWithParts, SentencePart, InterfaceLang, Level } from '@/types/database'
@@ -171,7 +173,7 @@ function ListView({
   userProgress: Record<string, any>
   lang: InterfaceLang
   level: Level
-  language: string
+  language: LearningLang
   isGenerating: boolean
   weeklyCount: number
   weeklyLimit: number
@@ -191,7 +193,7 @@ function ListView({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{ui.title}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {language === 'es' ? '🇪🇸' : '🇺🇸'} {level}
+            {getLearningLanguage(language).flag} {level}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -348,17 +350,6 @@ function TrainView({
   const understoodCount = parts.filter(p => understoodIds.has(p.id)).length
   const isLowLevel = ['A1', 'A2', 'B1'].includes(level)
 
-  const speak = (text: string, lang: string) => {
-    if (!window.speechSynthesis) return
-    window.speechSynthesis.cancel()
-    const utter = new SpeechSynthesisUtterance(text)
-    utter.lang = lang === 'es' ? 'es-ES' : 'en-US'
-    utter.rate = 0.85
-    const voices = window.speechSynthesis.getVoices()
-    const voice = voices.find(v => v.lang.startsWith(lang === 'es' ? 'es' : 'en'))
-    if (voice) utter.voice = voice
-    window.speechSynthesis.speak(utter)
-  }
 
   return (
     <div className="mx-auto max-w-lg px-4 py-6 space-y-4">
@@ -397,7 +388,7 @@ function TrainView({
             {sentence.translation_ru}
           </p>
           <button
-            onClick={() => speak(sentence.sentence_text, sentence.language ?? 'es')}
+            onClick={() => speak(sentence.sentence_text, sentence.language)}
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
           >
             <Volume2 className="h-3.5 w-3.5" />
@@ -438,7 +429,7 @@ function TrainView({
                   lang={lang}
                   learningLang={sentence.language ?? 'es'}
                   onTap={() => onMarkPart(sentence.id, part.id)}
-                  onSpeak={() => speak(part.text, sentence.language ?? 'es')}
+                  onSpeak={() => speak(part.text, sentence.language)}
                 />
               )
             })}

@@ -7,8 +7,11 @@
 // ENUMS
 // ============================================
 
-export type InterfaceLang = 'ru' | 'en' | 'es'
-export type LearningLang = 'es' | 'en'
+// Language codes come from the registry; they must match the Postgres enums
+// interface_lang and learning_lang (see lib/languages.ts)
+import type { InterfaceLang, LearningLang } from '@/lib/languages'
+export type { InterfaceLang, LearningLang }
+
 export type Level = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'
 export type AIModel = 'claude' | 'gpt' | 'gemini'
 export type SavedItemType = 'word' | 'sentence'

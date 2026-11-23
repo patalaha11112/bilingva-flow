@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ChevronRight, BookOpen, MessageSquare, PenLine, Video } from 'lucide-react'
 import type { InterfaceLang, LearningLang, Level } from '@/types/database'
 import { t } from '@/lib/i18n'
+import { getLearningLanguage } from '@/lib/languages'
 
 interface HomeTopSectionProps {
   lang: InterfaceLang
@@ -26,7 +27,7 @@ export function HomeTopSection({ lang, learningLang, level, stats }: HomeTopSect
         <div>
           <p className="text-xs text-muted-foreground mb-0.5">{t('learningLanguage', lang)}</p>
           <p className="text-base font-semibold">
-            {learningLang === 'es' ? '🇪🇸' : '🇺🇸'} {t(learningLang === 'es' ? 'lang_es' : 'lang_en', lang)}
+            {getLearningLanguage(learningLang).flag} {getLearningLanguage(learningLang).name[lang]}
           </p>
         </div>
 

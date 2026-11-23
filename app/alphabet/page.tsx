@@ -5,11 +5,9 @@ import { Volume2, Square } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
 import { getAlphabetData, type Letter, type Digraph } from '@/core/alphabet-data'
 import { cn } from '@/lib/utils'
+import { getLearningLanguage } from '@/lib/languages'
+import { speak, stopSpeaking } from '@/lib/speech'
 import type { LearningLang, InterfaceLang } from '@/types/database'
-
-function toLegacyLang(lang: LearningLang): 'spanish' | 'english' {
-  return lang === 'es' ? 'spanish' : 'english'
-}
 
 export default function AlphabetPage() {
   const { profile, activeLanguage } = useUser()
@@ -20,29 +18,17 @@ export default function AlphabetPage() {
   const [selected, setSelected] = useState<Letter | Digraph | null>(null)
   const [speaking, setSpeaking] = useState(false)
 
-  const alphabetData = getAlphabetData(toLegacyLang(learningLang))
+  const alphabetData = getAlphabetData(learningLang)
 
-  const speak = (text: string) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return
-    window.speechSynthesis.cancel()
-    const utter = new SpeechSynthesisUtterance(text)
-    utter.lang = alphabetData.langCode
-    utter.rate = 0.85
-    const voices = window.speechSynthesis.getVoices()
-    const langPrefix = alphabetData.langCode.split('-')[0]
-    const voice = voices.find(v => v.lang.startsWith(langPrefix))
-    if (voice) utter.voice = voice
-    utter.onstart = () => setSpeaking(true)
-    utter.onend = () => setSpeaking(false)
-    utter.onerror = () => setSpeaking(false)
-    window.speechSynthesis.speak(utter)
-  }
+  const say = (text: string) =>
+    speak(text, learningLang, {
+      onStart: () => setSpeaking(true),
+      onEnd: () => setSpeaking(false),
+    })
 
-  const stopSpeaking = () => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel()
-      setSpeaking(false)
-    }
+  const stop = () => {
+    stopSpeaking()
+    setSpeaking(false)
   }
 
   useEffect(() => {
@@ -55,12 +41,20 @@ export default function AlphabetPage() {
   const isSpecial = (item: Letter | Digraph): boolean =>
     'isSpecial' in item && !!item.isSpecial
 
+  if (!alphabetData) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-20 text-center">
+        <p className="text-sm text-muted-foreground">{uiText.noAlphabet[interfaceLang]}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-lg px-4 py-6 space-y-5">
 
       {/* ── Header ── */}
       <div className="text-center space-y-1.5">
-        <div className="text-2xl leading-none">{alphabetData.flag}</div>
+        <div className="text-2xl leading-none">{getLearningLanguage(learningLang).flag}</div>
         <h1 className="text-2xl font-bold tracking-tight">
           {alphabetData.title[interfaceLang]}
         </h1>
@@ -157,7 +151,7 @@ export default function AlphabetPage() {
                 {/* Audio buttons */}
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   <button
-                    onClick={() => speak(selected.letter)}
+                    onClick={() => say(selected.letter)}
                     className={cn(
                       'inline-flex items-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-xs font-medium text-primary transition-all cursor-pointer',
                       'hover:border-primary/40 hover:bg-primary/10',
@@ -168,7 +162,7 @@ export default function AlphabetPage() {
                     {uiText.playLetter[interfaceLang]}
                   </button>
                   <button
-                    onClick={() => speak(selected.name)}
+                    onClick={() => say(selected.name)}
                     className={cn(
                       'inline-flex items-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-xs font-medium text-primary transition-all cursor-pointer',
                       'hover:border-primary/40 hover:bg-primary/10',
@@ -179,7 +173,7 @@ export default function AlphabetPage() {
                     {uiText.playName[interfaceLang]}
                   </button>
                   <button
-                    onClick={stopSpeaking}
+                    onClick={stop}
                     className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-all cursor-pointer hover:text-foreground hover:border-border/80"
                   >
                     <Square className="h-3 w-3" />
@@ -204,7 +198,7 @@ export default function AlphabetPage() {
                 {selected.examples.map((ex) => (
                   <li key={ex.word} className="flex items-center gap-2 text-[0.9rem]">
                     <button
-                      onClick={() => speak(ex.word)}
+                      onClick={() => say(ex.word)}
                       className="text-primary/70 hover:text-primary transition-colors cursor-pointer"
                       aria-label={ex.word}
                     >
@@ -298,6 +292,11 @@ const uiText: Record<string, Record<InterfaceLang, string>> = {
     ru: 'Нажми на букву, чтобы узнать, как она читается',
     en: 'Tap a letter to learn how it sounds',
     es: 'Toca una letra para ver cómo se pronuncia',
+  },
+  noAlphabet: {
+    ru: 'Алфавит для этого языка пока не добавлен',
+    en: 'The alphabet for this language is not available yet',
+    es: 'El alfabeto de este idioma aún no está disponible',
   },
   digraphs: {
     ru: 'Диграфы',
