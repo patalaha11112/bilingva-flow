@@ -9,16 +9,6 @@ import { LIMITS, isAppAdmin, sanitizePromptText } from '@/lib/server/access'
 import { EssayBody, parseBody } from '@/lib/server/validation'
 import { markActivity } from '@/lib/server/activity'
 
-
-function getISOWeek(date: Date): { week: number; year: number } {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
-  return { week, year: d.getUTCFullYear() }
-}
-
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length
 }
@@ -57,7 +47,6 @@ export async function POST(request: NextRequest) {
     }
     const safeTopic = sanitizePromptText(topic, 200)
 
-
     let aiScore = 7
     let aiFeedback = ''
     let wordsUsed: string[] = []
@@ -85,7 +74,6 @@ export async function POST(request: NextRequest) {
       aiFeedback = getMessages(interface_language).server.essayFallbackFeedback
     }
 
-    const { week, year } = getISOWeek(new Date())
     const wordCount = countWords(content)
 
     // Save essay
@@ -101,8 +89,6 @@ export async function POST(request: NextRequest) {
         ai_score: aiScore,
         words_used: wordsUsed,
         is_bonus: is_bonus ?? false,
-        week_number: week,
-        year,
       })
       .select()
       .single()
