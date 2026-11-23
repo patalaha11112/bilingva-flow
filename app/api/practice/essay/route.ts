@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { InterfaceLang, LearningLang, Level } from '@/types/database'
 import { getInterfaceLanguage, getLearningLanguage } from '@/lib/languages'
+import { LIMITS, isAppAdmin, isInterfaceLang, isLearningLang, isLevel, sanitizePromptText } from '@/lib/server/access'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
@@ -37,9 +38,30 @@ export async function POST(request: NextRequest) {
       is_bonus?: boolean
     }
 
-    if (!content?.trim()) {
+    if (typeof content !== 'string' || !content.trim()) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 })
     }
+    if (!isLearningLang(language) || !isLevel(level) || !isInterfaceLang(interface_language)) {
+      return NextResponse.json({ error: 'Invalid language or level' }, { status: 400 })
+    }
+
+    const admin = await isAppAdmin(user.id)
+    if (!admin) {
+      if (content.length > LIMITS.essayMaxChars) {
+        return NextResponse.json({ error: 'Essay is too long', code: 'too_long' }, { status: 413 })
+      }
+      const dayStart = new Date()
+      dayStart.setUTCHours(0, 0, 0, 0)
+      const { count: essaysToday } = await supabaseAdmin
+        .from('user_essays')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', dayStart.toISOString())
+      if ((essaysToday ?? 0) >= LIMITS.essaysPerDay) {
+        return NextResponse.json({ error: 'Daily essay limit reached', code: 'limit_reached' }, { status: 429 })
+      }
+    }
+    const safeTopic = sanitizePromptText(String(topic ?? ''), 200)
 
     const langName = getLearningLanguage(language).prompt.name
     const uiLang = getInterfaceLanguage(interface_language).promptName
@@ -57,7 +79,7 @@ export async function POST(request: NextRequest) {
       const prompt = `You are an encouraging language teacher reviewing a student's essay written in ${langName}.
 
 Student level: ${level}
-Essay topic: "${topic}"
+Essay topic: "${safeTopic}"
 Respond in: ${uiLang}
 
 Essay:

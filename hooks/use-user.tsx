@@ -223,38 +223,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const setActiveLanguage = async (language: LearningLang) => {
     if (!user) return
 
-    // Activate the target first (keeping its saved level), so a failure never leaves no active language
-    const { data: existing, error: updateError } = await supabase
-      .from('user_language_settings')
-      .update({ is_active: true })
-      .eq('user_id', user.id)
-      .eq('learning_language', language)
-      .select()
-      .maybeSingle()
-
-    let activated = existing
-    if (!updateError && !existing) {
-      const { data: inserted, error: insertError } = await supabase
-        .from('user_language_settings')
-        .insert({ user_id: user.id, learning_language: language, is_active: true, level: 'A1', level_confirmed_at: null })
-        .select()
-        .single()
-      if (insertError) console.error('activate language:', insertError)
-      activated = inserted
-    }
-
-    if (!activated) {
-      if (updateError) console.error('activate language:', updateError)
+    // One transaction in the database: deactivates the others, activates (or creates) the target,
+    // keeping its saved level (see supabase/migrations, set_active_language)
+    const { data, error } = await supabase.rpc('set_active_language', { p_language: language })
+    if (error) {
+      console.error('activate language:', error)
       return
     }
-
-    await supabase
-      .from('user_language_settings')
-      .update({ is_active: false })
-      .eq('user_id', user.id)
-      .neq('learning_language', language)
-
-    setActiveLanguageState(activated)
+    setActiveLanguageState(data as UserLanguageSettings)
   }
 
   const value: UserContextValue = {

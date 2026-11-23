@@ -36,6 +36,7 @@ export default function SentencesPage() {
     error,
     weeklyCount,
     weeklyLimit,
+    limitReached,
     markPartUnderstood,
     markAllUnderstood,
     nextSentence,
@@ -91,6 +92,7 @@ export default function SentencesPage() {
       isGenerating={isGenerating}
       weeklyCount={weeklyCount}
       weeklyLimit={weeklyLimit}
+      limitReached={limitReached}
       onStartTrain={() => {
         setTrainIndex(0)
         setMode('train')
@@ -162,6 +164,7 @@ function ListView({
   isGenerating,
   weeklyCount,
   weeklyLimit,
+  limitReached,
   onStartTrain,
   onAddMore,
   onRefresh,
@@ -174,13 +177,14 @@ function ListView({
   isGenerating: boolean
   weeklyCount: number
   weeklyLimit: number
+  limitReached: boolean
   onStartTrain: () => void
   onAddMore: () => void
   onRefresh: () => void
 }) {
   const ui = UI[lang] ?? UI.ru
   const MAX_SENTENCES = 10
-  const canAddMore = weeklyCount < weeklyLimit
+  const canAddMore = weeklyCount < weeklyLimit && !limitReached
 
   return (
     <div className="mx-auto max-w-lg space-y-4 px-4 py-6">
@@ -196,7 +200,7 @@ function ListView({
         <div className="flex items-center gap-2">
           <button
             onClick={onRefresh}
-            disabled={isGenerating}
+            disabled={isGenerating || limitReached}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title={lang === 'ru' ? 'Обновить предложения' : lang === 'es' ? 'Actualizar sugerencias' : 'Refresh suggestions'}
           >
@@ -283,7 +287,9 @@ function ListView({
         </button>
       ) : (
         <div className="w-full rounded-2xl border border-dashed border-amber-500/30 bg-amber-500/5 py-3 px-4 text-sm text-amber-700 dark:text-amber-400 text-center">
-          {lang === 'ru' ? 'Лимит достигнут. Нажмите обновить для новых предложений' : lang === 'es' ? 'Límite alcanzado. Haz clic en actualizar para nuevas oraciones' : 'Limit reached. Click refresh for new sentences'}
+          {limitReached
+            ? (lang === 'ru' ? 'Лимит предложений на эту неделю исчерпан. Новые — с понедельника' : lang === 'es' ? 'Has alcanzado el límite de esta semana. Habrá nuevas el lunes' : 'This week\'s sentence limit is used up. New ones on Monday')
+            : (lang === 'ru' ? 'Лимит достигнут. Нажмите обновить для новых предложений' : lang === 'es' ? 'Límite alcanzado. Haz clic en actualizar para nuevas oraciones' : 'Limit reached. Click refresh for new sentences')}
         </div>
       )}
 

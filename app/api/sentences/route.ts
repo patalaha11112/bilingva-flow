@@ -3,6 +3,16 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getInterfaceLanguage, getLearningLanguage } from "@/lib/languages";
+import {
+  LIMITS,
+  getWeekStart,
+  isAppAdmin,
+  isInterfaceLang,
+  isLearningLang,
+  isLevel,
+  isUuid,
+  sanitizePromptText,
+} from "@/lib/server/access";
 import type {
   LearningLang,
   Level,
@@ -11,15 +21,6 @@ import type {
 } from "@/types/database";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
-// Start of the current ISO week (Monday 00:00 UTC). A sentence belongs to the
-// week in which it was first shown (user_sentences.first_seen_at).
-function getWeekStart(date: Date = new Date()): string {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() - (dayNum - 1));
-  return d.toISOString();
-}
 
 const SENTENCE_FIELDS =
   "id, sentence_text, translation_ru, translation_en, topic_id, custom_topic, language, sentence_parts(*)";
@@ -63,12 +64,49 @@ export async function POST(request: NextRequest) {
         add_count?: number;
       };
 
+    if (!isLearningLang(language) || !isLevel(level) || !isInterfaceLang(interface_language)) {
+      return NextResponse.json({ error: "Invalid language or level" }, { status: 400 });
+    }
+    if (topic_id != null && !isUuid(topic_id)) {
+      return NextResponse.json({ error: "Invalid topic" }, { status: 400 });
+    }
+
     const weekStart = getWeekStart();
+    const admin = await isAppAdmin(user.id);
+
+    // Custom topics end up in the shared sentence pool, so only admins may set them
+    const customTopic =
+      admin && typeof custom_topic === "string"
+        ? sanitizePromptText(custom_topic, LIMITS.customTopicMaxChars) || undefined
+        : undefined;
+
+    // How many more sentences this user may get this week (AI cost guard)
+    const { count: linkedThisWeek } = await supabaseAdmin
+      .from("user_sentences")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("language", language)
+      .gte("first_seen_at", weekStart);
+    const remaining = admin ? Infinity : LIMITS.sentencesPerWeek - (linkedThisWeek ?? 0);
+    const maxActive = admin ? 100 : LIMITS.activeSentences;
+    const limitReached = () =>
+      NextResponse.json({ error: "Weekly limit reached", code: "limit_reached" }, { status: 429 });
 
     // ─────────────────────────────────────────
     // ADD 1: add exactly N new sentences
     // ─────────────────────────────────────────
     if (add_count) {
+      const { count: activeCount } = await supabaseAdmin
+        .from("user_sentences")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("language", language)
+        .gte("first_seen_at", weekStart)
+        .eq("is_active", true);
+      const requested = admin ? Math.min(Math.max(1, Math.floor(Number(add_count)) || 1), 20) : 1;
+      const count = Math.min(requested, remaining, maxActive - (activeCount ?? 0));
+      if (count <= 0) return limitReached();
+
       const newSentences = await getNewSentences(
         supabase,
         supabaseAdmin,
@@ -76,9 +114,9 @@ export async function POST(request: NextRequest) {
         language,
         level,
         topic_id,
-        custom_topic,
+        customTopic,
         interface_language,
-        add_count
+        count
       );
 
       await linkSentences(supabaseAdmin, user.id, language, newSentences.map((s: any) => s.id));
@@ -96,7 +134,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         sentences: newSentences,
         generated: true,
-        weeklyLimit: { total: allActive?.length ?? add_count, max: 10 },
+        weeklyLimit: { total: allActive?.length ?? count, max: maxActive },
         userProgress,
       });
     }
@@ -129,7 +167,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Fill the week up to 5 sentences
-      const needed = Math.max(0, 5 - existingSentences.length);
+      const needed = Math.max(0, Math.min(5 - existingSentences.length, remaining));
       const newSentences = needed > 0
         ? await getNewSentences(
             supabase,
@@ -138,7 +176,7 @@ export async function POST(request: NextRequest) {
             language,
             level,
             topic_id,
-            custom_topic,
+            customTopic,
             interface_language,
             needed
           )
@@ -150,7 +188,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         sentences: totalSentences,
         generated: newSentences.length > 0,
-        weeklyLimit: { total: totalSentences.length, max: 10 },
+        weeklyLimit: { total: totalSentences.length, max: maxActive },
         userProgress,
       });
     }
@@ -159,6 +197,8 @@ export async function POST(request: NextRequest) {
     // 2. REFRESH: replace active set with 5 new, keep progress
     // ─────────────────────────────────────────
     if (refresh) {
+      if (remaining < 5) return limitReached();
+
       const { data: currentActive } = await supabaseAdmin
         .from("user_sentences")
         .select("id")
@@ -175,7 +215,7 @@ export async function POST(request: NextRequest) {
         language,
         level,
         topic_id,
-        custom_topic,
+        customTopic,
         interface_language,
         5
       );
@@ -198,7 +238,7 @@ export async function POST(request: NextRequest) {
         generated: true,
         weeklyLimit: {
           total: newSentences.length,
-          max: 10,
+          max: maxActive,
         },
         userProgress,
       });

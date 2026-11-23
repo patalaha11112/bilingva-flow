@@ -42,17 +42,6 @@ export interface UserLanguageSettings {
   updated_at: string
 }
 
-export interface AlphabetExplanation {
-  id: string
-  language: LearningLang
-  letter: string
-  letter_name: string
-  explanation: string
-  interface_language: InterfaceLang
-  ai_model: AIModel
-  created_at: string
-}
-
 export interface Topic {
   id: string
   language: LearningLang
@@ -384,11 +373,6 @@ export type Database = {
         Row: UserLanguageSettings
         Insert: Omit<UserLanguageSettings, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<UserLanguageSettings, 'id' | 'created_at'>>
-      }
-      alphabet_explanations: {
-        Row: AlphabetExplanation
-        Insert: Omit<AlphabetExplanation, 'id' | 'created_at'>
-        Update: Partial<Omit<AlphabetExplanation, 'id' | 'created_at'>>
       }
       topics: {
         Row: Topic

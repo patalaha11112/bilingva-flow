@@ -15,6 +15,8 @@ interface UseSentencesReturn {
   userProgress: Record<string, UserSentence>
   weeklyCount: number
   weeklyLimit: number
+  /** The server refused more sentences this week */
+  limitReached: boolean
 
   // State
   isLoading: boolean
@@ -54,7 +56,8 @@ export function useSentences({
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [weeklyCount, setWeeklyCount] = useState(0)
-  const [weeklyLimit] = useState(10)
+  const [weeklyLimit, setWeeklyLimit] = useState(10)
+  const [limitReached, setLimitReached] = useState(false)
 
   const fetchSentences = useCallback(async () => {
     if (!enabled) return
@@ -108,6 +111,7 @@ export function useSentences({
 
       if (data.weeklyLimit) {
         setWeeklyCount(data.weeklyLimit.total)
+        setWeeklyLimit(data.weeklyLimit.max)
       }
 
       if (data.userProgress) {
@@ -206,6 +210,11 @@ export function useSentences({
         }),
       })
 
+      if (res.status === 429) {
+        setLimitReached(true)
+        return
+      }
+
       if (!res.ok) {
         let errorMsg = 'Failed to fetch more sentences'
         try {
@@ -235,6 +244,7 @@ export function useSentences({
 
       if (data.weeklyLimit) {
         setWeeklyCount(data.weeklyLimit.total)
+        setWeeklyLimit(data.weeklyLimit.max)
       }
 
       if (data.userProgress) {
@@ -269,6 +279,11 @@ export function useSentences({
         }),
       })
 
+      if (res.status === 429) {
+        setLimitReached(true)
+        return
+      }
+
       if (!res.ok) {
         let errorMsg = 'Failed to refresh sentences'
         try {
@@ -299,6 +314,7 @@ export function useSentences({
 
       if (data.weeklyLimit) {
         setWeeklyCount(data.weeklyLimit.total)
+        setWeeklyLimit(data.weeklyLimit.max)
       }
 
       if (data.userProgress) {
@@ -319,6 +335,7 @@ export function useSentences({
     userProgress,
     weeklyCount,
     weeklyLimit,
+    limitReached,
     isLoading,
     isGenerating,
     error,
