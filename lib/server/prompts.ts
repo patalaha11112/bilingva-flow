@@ -13,12 +13,15 @@ export function sentencesPrompt({
   topicName,
   interfaceLanguage,
   count,
+  focus = [],
 }: {
   language: LearningLang
   level: Level
   topicName: string
   interfaceLanguage: InterfaceLang
   count: number
+  /** Patterns from the latest weekly report to practise */
+  focus?: string[]
 }): string {
   const learning = getLearningLanguage(language).prompt
   const langName = learning.name
@@ -47,7 +50,11 @@ These ${count} sentences must form a connected mini-story about the topic.
 - Prefer practical, everyday vocabulary over abstract or literary words
 - Each sentence must cover a different grammar pattern or vocabulary area
 
-## Splitting Rules
+${focus.length ? `## Focus
+The student is working on: ${focus.join('; ')}.
+Naturally include these patterns in at least half of the sentences, without making them feel forced.
+
+` : ''}## Splitting Rules
 Split each sentence into 2–5 parts by grammatical units:
 - subject or subject phrase
 - verb phrase (verb + auxiliary if any)
@@ -260,12 +267,15 @@ export function essayTopicPrompt({
   interfaceLanguage,
   level,
   sentences,
+  focus = [],
 }: {
   language: LearningLang
   interfaceLanguage: InterfaceLang
   level: Level
   /** The set's sentences with their translations */
   sentences: { text: string; translation: string }[]
+  /** Patterns from the latest weekly report to practise */
+  focus?: string[]
 }): string {
   const langName = getLearningLanguage(language).prompt.name
   const uiLang = getInterfaceLanguage(interfaceLanguage).promptName
@@ -277,7 +287,8 @@ ${list}
 
 Create a short essay assignment so the student practises exactly this material:
 - topic: one engaging essay topic in ${uiLang}, connected to the situation of these sentences but asking the student to write about their own life or opinion (max 12 words). No quotes.
-- words: 6–8 useful words or short phrases taken from the sentences above, in ${langName} exactly as they appear (verbs may be given in the form used), each with a translation into ${uiLang}. Prefer the most useful vocabulary and patterns; skip names and trivial words.`
+${focus.length ? `- The student is also working on: ${focus.join('; ')}. Choose a topic that naturally needs these patterns.
+` : ''}- words: 6–8 useful words or short phrases taken from the sentences above, in ${langName} exactly as they appear (verbs may be given in the form used), each with a translation into ${uiLang}. Prefer the most useful vocabulary and patterns; skip names and trivial words.`
 }
 
 export const ESSAY_TOPIC_SCHEMA = {
@@ -294,4 +305,100 @@ export const ESSAY_TOPIC_SCHEMA = {
     },
   },
   required: ['topic', 'words'],
+}
+
+export interface WeeklyReportInput {
+  language: LearningLang
+  interfaceLanguage: InterfaceLang
+  levelSet: Level
+  stats: Record<string, number | null>
+  backTranslations: { original: string; attempt: string; score: number; corrections: { yours: string; better: string; why: string }[] }[]
+  essays: { topic: string; excerpt: string; score: number | null; improvements: { original: string; better: string; why: string }[] }[]
+  previousFocus: string[]
+}
+
+export function weeklyReportPrompt(input: WeeklyReportInput): string {
+  const langName = getLearningLanguage(input.language).prompt.name
+  const uiLang = getInterfaceLanguage(input.interfaceLanguage).promptName
+
+  const backT = input.backTranslations
+    .map((b, i) => `${i + 1}. STUDENT WROTE: "${b.attempt}" | score ${b.score}/10 | ` +
+      (b.corrections.length
+        ? `mistakes: ${b.corrections.map((c) => `"${c.yours}" should be "${c.better}" (${c.why})`).join('; ')}`
+        : 'no mistakes') +
+      ` | (reference only, do not cite: "${b.original}")`)
+    .join('\n') || '(none)'
+  const essays = input.essays
+    .map((e, i) => `${i + 1}. topic: "${e.topic}" | score ${e.score ?? '?'}/10 | STUDENT WROTE: "${e.excerpt}"` +
+      (e.improvements.length ? ` | mistakes: ${e.improvements.map((c) => `"${c.original}" should be "${c.better}" (${c.why})`).join('; ')}` : ' | no mistakes found'))
+    .join('\n') || '(none)'
+
+  return `You are a warm, encouraging and precise ${langName} teacher writing a weekly progress report for your student.
+The student's native language is ${uiLang}; the level chosen in the app is ${input.levelSet}.
+IMPORTANT: write every text field in ${uiLang}. Only the examples are in ${langName}.
+
+## This week's numbers
+${Object.entries(input.stats).map(([k, v]) => `- ${k}: ${v ?? '—'}`).join('\n')}
+
+## Back-translations
+"original" is the model sentence; "student" is what the student wrote from memory. Judge the student only by what THEY wrote.
+${backT}
+
+## Essays (written in ${langName})
+${essays}
+
+## Focus areas from last week
+${input.previousFocus.length ? input.previousFocus.map((f) => `- ${f}`).join('\n') : '(none — this is the first report)'}
+
+Write the report in ${uiLang} (except examples, which are in ${langName}).
+
+Rules:
+- Tone: positive and motivating. Present weaknesses as "next steps", never as failures. Be specific, not generic.
+- Base everything ONLY on the evidence above.
+- strengths and known: only things the student got RIGHT in what THEY wrote. Never cite a reference sentence, never cite a phrase listed under mistakes, and never list as "known" a pattern the student got wrong this week.
+- In strengths, the example is a correct phrase the student wrote.
+- level_estimate: the CEFR level the evidence shows. With little evidence, stay close to the chosen level and set confidence "low".
+- level_comment: 1–2 sentences explaining the estimate in friendly terms.
+- headline: one short, upbeat sentence summarising the week.
+- strengths: 2–3 things that went well, each with a short example from the student's work.
+- known: 3–6 short items the student clearly already handles (grammar patterns, vocabulary areas).
+- focus_areas: 2–3 most useful things to work on next week, based on recurring corrections. For each: title (short), why (one sentence, encouraging), example (a correct ${langName} example), prompt_hint (in English, a short description of the grammar/vocabulary pattern for generating practice material, e.g. "written accents on past-tense verbs (quería, también)").
+- If last week's focus areas improved, mention it in strengths or the encouragement.
+- encouragement: 1–2 sentences to motivate the coming week.
+
+Remember: all text in ${uiLang}.`
+}
+
+export const WEEKLY_REPORT_SCHEMA = {
+  type: 'object',
+  properties: {
+    headline: { type: 'string' },
+    level_estimate: { type: 'string', enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] },
+    confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+    level_comment: { type: 'string' },
+    strengths: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { title: { type: 'string' }, example: { type: 'string' } },
+        required: ['title', 'example'],
+      },
+    },
+    known: { type: 'array', items: { type: 'string' } },
+    focus_areas: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          why: { type: 'string' },
+          example: { type: 'string' },
+          prompt_hint: { type: 'string' },
+        },
+        required: ['title', 'why', 'example', 'prompt_hint'],
+      },
+    },
+    encouragement: { type: 'string' },
+  },
+  required: ['headline', 'level_estimate', 'confidence', 'level_comment', 'strengths', 'known', 'focus_areas', 'encouragement'],
 }

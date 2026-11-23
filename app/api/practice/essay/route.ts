@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
         content,
         word_count: wordCount,
         ai_feedback: aiFeedback,
+        ai_details: { improvements: aiImprovements, alternatives: aiAlternatives },
         ai_score: aiScore,
         words_used: wordsUsed,
         is_bonus: is_bonus ?? false,

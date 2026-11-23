@@ -74,6 +74,19 @@ export const BackTBackBody = z.object({
   tz: timeZone,
 })
 
+export const ReportQuery = z.object({
+  language: learningLang,
+  interface_lang: interfaceLang.catch(DEFAULT_INTERFACE_LANG),
+  level,
+  tz: timeZone,
+  /** "1": also return earlier reports */
+  history: z.literal('1').optional(),
+})
+
+export const ReportAnswerBody = z.object({
+  id: z.string().uuid(),
+})
+
 export const TopicQuery = z.object({
   language: learningLang,
   interface_lang: interfaceLang.catch(DEFAULT_INTERFACE_LANG),

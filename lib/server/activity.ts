@@ -22,6 +22,19 @@ export function localDate(tz: string, date: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
 }
 
+/** Adds days to a 'YYYY-MM-DD' date */
+export function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Monday of the week that contains a 'YYYY-MM-DD' date */
+export function weekStartOf(date: string): string {
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay() || 7
+  return addDays(date, 1 - day)
+}
+
 type ActivityPatch = {
   /** Adds to sentences_done */
   sentencesDone?: number

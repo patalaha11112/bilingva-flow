@@ -23,6 +23,7 @@ export const AI_MODELS = {
   backTranslation: process.env.GEMINI_MODEL_BACK_TRANSLATION || 'gemini-4-hydrogen',
   // Once per set; flash-lite mistranslated words here, so the better model is worth it
   essayTopic: process.env.GEMINI_MODEL_ESSAY_TOPIC || 'gemini-4-hydrogen',
+  weeklyReport: process.env.GEMINI_MODEL_WEEKLY_REPORT || 'gemini-4-hydrogen',
 } as const
 
 const TIMEOUT_MS = 60_000
@@ -49,11 +50,28 @@ async function callModel(model: string, prompt: string, schema: object): Promise
 }
 
 /** Runs a prompt and returns the JSON response, shaped by `schema`; falls back to a lighter model on failure */
-export async function generateJson<T>(model: string, prompt: string, schema: object): Promise<T> {
+const isOverloaded = (err: unknown) => /\b(503|429)\b|UNAVAILABLE|RESOURCE_EXHAUSTED/.test(String(err instanceof Error ? err.message : err))
+
+export async function generateJson<T>(
+  model: string,
+  prompt: string,
+  schema: object,
+  /** false: fail instead of using the lighter model (for tasks where quality matters more than speed) */
+  { fallback = true }: { fallback?: boolean } = {}
+): Promise<T> {
   try {
     return JSON.parse(await callModel(model, prompt, schema)) as T
   } catch (err) {
-    if (model === FALLBACK_MODEL) throw err
+    // Overload spikes are usually brief: one retry of the primary before falling back
+    if (isOverloaded(err)) {
+      await new Promise((r) => setTimeout(r, 2_000))
+      try {
+        return JSON.parse(await callModel(model, prompt, schema)) as T
+      } catch (retryErr) {
+        err = retryErr
+      }
+    }
+    if (!fallback || model === FALLBACK_MODEL) throw err
     console.error(`[ai] ${model} failed, falling back to ${FALLBACK_MODEL}:`, err instanceof Error ? err.message : err)
     return JSON.parse(await callModel(FALLBACK_MODEL, prompt, schema)) as T
   }

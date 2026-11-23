@@ -7,6 +7,7 @@ import { TopicQuery, parseQuery } from '@/lib/server/validation'
 import { getCurrentSet, loadSetSentences } from '@/lib/server/sentences'
 import { AI_MODELS, generateJson } from '@/lib/server/ai'
 import { ESSAY_TOPIC_SCHEMA, essayTopicPrompt } from '@/lib/server/prompts'
+import { getFocusHints } from '@/lib/server/reports'
 
 export const maxDuration = 60
 
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
               interfaceLanguage: uiLang,
               level: set.level,
               sentences: sentences.map((s: any) => ({ text: s.sentence_text, translation: s.translation })),
+              focus: await getFocusHints(supabase, user.id, language),
             }),
             ESSAY_TOPIC_SCHEMA
           )

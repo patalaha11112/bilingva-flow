@@ -35,6 +35,15 @@ export function dayHeading(locale: string, date: Date): string {
   )
 }
 
+/** Monday–Sunday range of a week, e.g. "17–23 ноября" */
+export function weekRange(locale: string, mondayStr: string): string {
+  const start = parseLocalDate(mondayStr)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  const fmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long' })
+  return typeof fmt.formatRange === 'function' ? fmt.formatRange(start, end) : `${fmt.format(start)} – ${fmt.format(end)}`
+}
+
 /** IANA time zone of this device, sent to the API so "today" is the user's day */
 export function getTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'

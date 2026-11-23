@@ -4,6 +4,7 @@ import { localized } from '@/lib/languages'
 import { AI_MODELS, generateJson } from '@/lib/server/ai'
 import { SENTENCES_SCHEMA, sentencesPrompt } from '@/lib/server/prompts'
 import { localDate } from '@/lib/server/activity'
+import { getFocusHints } from '@/lib/server/reports'
 import type { GeneratedSentence, InterfaceLang, LearningLang, Level } from '@/types/database'
 
 // ============================================
@@ -197,7 +198,8 @@ export async function getNewSentences(
     if (topic) topicName = localized(topic.name, interfaceLanguage)
   }
 
-  const generated = await generateSentences({ language, level, topicName, interfaceLanguage, count: toGenerate })
+  const focus = await getFocusHints(supabase, userId, language)
+  const generated = await generateSentences({ language, level, topicName, interfaceLanguage, count: toGenerate, focus })
 
   // The shared pool is written with the service role
   const admin = createAdminClient()
@@ -242,6 +244,7 @@ async function generateSentences(params: {
   topicName: string
   interfaceLanguage: InterfaceLang
   count: number
+  focus: string[]
 }): Promise<GeneratedSentence[]> {
   try {
     const parsed = await generateJson<GeneratedSentence[]>(AI_MODELS.sentences, sentencesPrompt(params), SENTENCES_SCHEMA)
