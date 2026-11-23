@@ -3,6 +3,7 @@ import { Geist } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Header } from '@/components/header'
 import { BottomNav } from '@/components/bottom-nav'
+import { UserProvider } from '@/hooks/use-user'
 import './globals.css'
 
 const geist = Geist({ subsets: ['latin'] })
@@ -41,11 +42,13 @@ export default function RootLayout({
         />
       </head>
       <body className={`${geist.className} antialiased bg-background`}>
-        <Header />
-        <main className="pb-20">
-          {children}
-        </main>
-        <BottomNav />
+        <UserProvider>
+          <Header />
+          <main className="pb-20">
+            {children}
+          </main>
+          <BottomNav />
+        </UserProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

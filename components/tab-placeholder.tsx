@@ -14,8 +14,7 @@ interface TabPlaceholderProps {
 const soonLabel = { ru: 'Скоро', en: 'Coming soon', es: 'Próximamente' } as const
 
 export function TabPlaceholder({ icon: Icon, titleKey, gradient }: TabPlaceholderProps) {
-  const { profile } = useUser()
-  const lang = profile?.interface_language ?? 'ru'
+  const { interfaceLang: lang } = useUser()
 
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col items-center justify-center p-8 text-center">

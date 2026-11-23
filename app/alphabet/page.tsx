@@ -7,13 +7,11 @@ import { getAlphabetData, type Letter, type Digraph } from '@/core/alphabet-data
 import { cn } from '@/lib/utils'
 import { getLearningLanguage } from '@/lib/languages'
 import { speak, stopSpeaking } from '@/lib/speech'
-import type { LearningLang, InterfaceLang } from '@/types/database'
+import type { InterfaceLang } from '@/types/database'
 
 export default function AlphabetPage() {
-  const { profile, activeLanguage } = useUser()
+  const { interfaceLang, learningLang } = useUser()
 
-  const learningLang: LearningLang = activeLanguage?.learning_language ?? 'es'
-  const interfaceLang: InterfaceLang = profile?.interface_language ?? 'ru'
 
   const [selected, setSelected] = useState<Letter | Digraph | null>(null)
   const [speaking, setSpeaking] = useState(false)

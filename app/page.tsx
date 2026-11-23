@@ -22,7 +22,7 @@ const tipLabel: Record<InterfaceLang, string> = {
 
 export default function Home() {
   const router = useRouter()
-  const { user, profile, activeLanguage, stats, weekActivity, isLoading, error } = useUser()
+  const { user, profile, interfaceLang: lang, learningLang, level, stats, weekActivity, isLoading, error, refetch } = useUser()
   const [tip, setTip] = useState<string | null>(null)
 
   useEffect(() => {
@@ -31,16 +31,18 @@ export default function Home() {
     }
   }, [isLoading, user, router])
 
+  // User data is shared across pages; refresh stats quietly when returning home
   useEffect(() => {
-    if (!profile) return
-    const lang = profile.interface_language
-    const level = activeLanguage?.level ?? 'A1'
-    const learningLang = activeLanguage?.learning_language ?? 'es'
+    if (!isLoading) refetch({ silent: true })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!user) return
     fetch(`/api/tips?language=${learningLang}&level=${level}&interface_lang=${lang}`)
       .then(r => r.json())
       .then((d: { tip?: string | null }) => { if (d.tip) setTip(d.tip) })
       .catch(() => {})
-  }, [profile, activeLanguage])
+  }, [user, lang, learningLang, level])
 
   if (isLoading) return <HomeSkeletons />
   if (!user) return null
@@ -52,10 +54,6 @@ export default function Home() {
       </div>
     )
   }
-
-  const lang = profile.interface_language
-  const level = activeLanguage?.level ?? 'A1'
-  const learningLang = activeLanguage?.learning_language ?? 'es'
 
   return (
     <div className="mx-auto max-w-lg space-y-5 px-4 py-6">

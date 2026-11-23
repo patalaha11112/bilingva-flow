@@ -26,12 +26,12 @@ import {
   LEARNING_LANGUAGES,
   LEARNING_LANG_CODES,
 } from '@/lib/languages'
-import type { InterfaceLang, LearningLang, Level } from '@/types/database'
+import type { Level } from '@/types/database'
 
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { profile, activeLanguage, updateProfile, updateLevel, setActiveLanguage, isLoading } = useUser()
+  const { interfaceLang: lang, learningLang, level, updateProfile, updateLevel, setActiveLanguage, isLoading } = useUser()
 
   const [isDark, setIsDark] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -59,9 +59,6 @@ export default function SettingsPage() {
     router.refresh()
   }
 
-  const lang: InterfaceLang = profile?.interface_language ?? 'ru'
-  const level: Level = activeLanguage?.level ?? 'A1'
-  const learningLang: LearningLang = activeLanguage?.learning_language ?? 'es'
 
   const getLevelDescription = (lvl: Level) => LEVEL_DESCRIPTIONS[lvl][lang]
 

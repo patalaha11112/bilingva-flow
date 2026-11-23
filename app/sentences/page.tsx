@@ -19,7 +19,7 @@ import type { SentenceWithParts, SentencePart, InterfaceLang, Level } from '@/ty
 
 export default function SentencesPage() {
   const router = useRouter()
-  const { user, profile, activeLanguage, isLoading: userLoading } = useUser()
+  const { user, interfaceLang: lang, learningLang: language, level, isLoading: userLoading } = useUser()
   const [mode, setMode] = useState<'list' | 'train'>('list')
   const [trainIndex, setTrainIndex] = useState(0)
 
@@ -27,9 +27,6 @@ export default function SentencesPage() {
     if (!userLoading && !user) router.push('/login')
   }, [userLoading, user, router])
 
-  const lang = profile?.interface_language ?? 'ru'
-  const level = activeLanguage?.level ?? 'A1'
-  const language = activeLanguage?.learning_language ?? 'es'
 
   const {
     sentences,
@@ -427,7 +424,7 @@ function TrainView({
                   part={part}
                   isUnderstood={isUnderstood}
                   lang={lang}
-                  learningLang={sentence.language ?? 'es'}
+                  learningLang={sentence.language}
                   onTap={() => onMarkPart(sentence.id, part.id)}
                   onSpeak={() => speak(part.text, sentence.language)}
                 />

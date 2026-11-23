@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { DEFAULT_INTERFACE_LANG } from '@/lib/languages'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const language = searchParams.get('language')
     const level = searchParams.get('level')
-    const interfaceLang = searchParams.get('interface_lang') ?? 'ru'
+    const interfaceLang = searchParams.get('interface_lang') ?? DEFAULT_INTERFACE_LANG
 
     if (!language || !level) {
       return NextResponse.json({ error: 'language and level required' }, { status: 400 })

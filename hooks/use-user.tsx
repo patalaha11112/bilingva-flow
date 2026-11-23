@@ -1,6 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+'use client'
+
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
+import {
+  DEFAULT_INTERFACE_LANG,
+  DEFAULT_LEARNING_LANG,
+  INTERFACE_LANG_CODES,
+  getInterfaceLanguage,
+} from '@/lib/languages'
 import type {
   UserProfile,
   UserLanguageSettings,
@@ -11,10 +19,15 @@ import type {
   InterfaceLang,
 } from '@/types/database'
 
-interface UseUserReturn {
+interface UserContextValue {
   user: User | null
   profile: UserProfile | null
   activeLanguage: UserLanguageSettings | null
+  /** Interface language: profile → browser → DEFAULT_INTERFACE_LANG */
+  interfaceLang: InterfaceLang
+  /** Active learning language, or the default while none is set */
+  learningLang: LearningLang
+  level: Level
   stats: UserStats
   weekActivity: WeekActivity[]
   isLoading: boolean
@@ -22,34 +35,57 @@ interface UseUserReturn {
   updateProfile: (updates: Partial<Pick<UserProfile, 'interface_language' | 'app_color'>>) => Promise<void>
   updateLevel: (language: LearningLang, level: Level) => Promise<void>
   setActiveLanguage: (language: LearningLang) => Promise<void>
-  refetch: () => Promise<void>
+  /** Reloads everything; silent=true keeps current data on screen instead of showing loading state */
+  refetch: (options?: { silent?: boolean }) => Promise<void>
 }
 
-export function useUser(): UseUserReturn {
-  const supabase = createClient()
+const EMPTY_STATS: UserStats = {
+  sentences_completed: 0,
+  dialogs_completed: 0,
+  essays_completed: 0,
+  videos_completed: 0,
+}
+
+const UserContext = createContext<UserContextValue | null>(null)
+
+export function useUser(): UserContextValue {
+  const ctx = useContext(UserContext)
+  if (!ctx) throw new Error('useUser must be used inside <UserProvider>')
+  return ctx
+}
+
+export function UserProvider({ children }: { children: ReactNode }) {
+  const supabase = useRef(createClient()).current
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [activeLanguage, setActiveLanguageState] = useState<UserLanguageSettings | null>(null)
-  const [stats, setStats] = useState<UserStats>({
-    sentences_completed: 0,
-    dialogs_completed: 0,
-    essays_completed: 0,
-    videos_completed: 0,
-  })
+  const [stats, setStats] = useState<UserStats>(EMPTY_STATS)
   const [weekActivity, setWeekActivity] = useState<WeekActivity[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [browserLang, setBrowserLang] = useState<InterfaceLang | null>(null)
+  // Id of the user the loaded data belongs to; undefined until the first load finishes
+  const loadedUserId = useRef<string | null | undefined>(undefined)
 
-  const fetchAll = useCallback(async () => {
+  // navigator is only available after hydration
+  useEffect(() => {
+    setBrowserLang(detectBrowserLang())
+  }, [])
+
+  const fetchAll = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
-      setIsLoading(true)
+      if (!silent) setIsLoading(true)
       setError(null)
 
       const { data: { user: authUser } } = await supabase.auth.getUser()
+      loadedUserId.current = authUser?.id ?? null
       if (!authUser) {
         setUser(null)
         setProfile(null)
+        setActiveLanguageState(null)
+        setStats(EMPTY_STATS)
+        setWeekActivity([])
         return
       }
 
@@ -77,7 +113,7 @@ export function useUser(): UseUserReturn {
         .eq('is_active', true)
         .maybeSingle()
 
-      if (langData) setActiveLanguageState(langData)
+      setActiveLanguageState(langData ?? null)
 
       // Weekly stats
       const now = new Date()
@@ -92,14 +128,14 @@ export function useUser(): UseUserReturn {
         .eq('year', year)
         .maybeSingle()
 
-      if (analyticsData) {
-        setStats({
-          sentences_completed: analyticsData.sentences_completed,
-          dialogs_completed: analyticsData.dialogs_completed,
-          essays_completed: analyticsData.essays_completed,
-          videos_completed: analyticsData.videos_completed,
-        })
-      }
+      setStats(analyticsData
+        ? {
+            sentences_completed: analyticsData.sentences_completed,
+            dialogs_completed: analyticsData.dialogs_completed,
+            essays_completed: analyticsData.essays_completed,
+            videos_completed: analyticsData.videos_completed,
+          }
+        : EMPTY_STATS)
 
       // Daily activity for week rings
       const weekDates = getWeekDates(now)
@@ -134,16 +170,30 @@ export function useUser(): UseUserReturn {
     } finally {
       setIsLoading(false)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [supabase])
 
+  // The provider outlives page navigation, so reload when a different user signs in or out.
+  // Supabase also emits SIGNED_IN for the same user (e.g. on tab focus) — those are ignored.
   useEffect(() => {
     fetchAll()
-  }, [fetchAll])
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (loadedUserId.current === undefined) return
+      if ((session?.user?.id ?? null) !== loadedUserId.current) fetchAll()
+    })
+    return () => subscription.unsubscribe()
+  }, [fetchAll, supabase])
+
+  const interfaceLang = profile?.interface_language ?? browserLang ?? DEFAULT_INTERFACE_LANG
+  const learningLang = activeLanguage?.learning_language ?? DEFAULT_LEARNING_LANG
+  const level = activeLanguage?.level ?? 'A1'
+
+  useEffect(() => {
+    document.documentElement.lang = getInterfaceLanguage(interfaceLang).locale
+  }, [interfaceLang])
 
   const updateProfile = async (
     updates: Partial<Pick<UserProfile, 'interface_language' | 'app_color'>>
   ) => {
-    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
     const { error } = await supabase
@@ -157,7 +207,6 @@ export function useUser(): UseUserReturn {
   }
 
   const updateLevel = async (language: LearningLang, level: Level) => {
-    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
     const { error } = await supabase
@@ -172,30 +221,49 @@ export function useUser(): UseUserReturn {
   }
 
   const setActiveLanguage = async (language: LearningLang) => {
-    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+
+    // Activate the target first (keeping its saved level), so a failure never leaves no active language
+    const { data: existing, error: updateError } = await supabase
+      .from('user_language_settings')
+      .update({ is_active: true })
+      .eq('user_id', user.id)
+      .eq('learning_language', language)
+      .select()
+      .maybeSingle()
+
+    let activated = existing
+    if (!updateError && !existing) {
+      const { data: inserted, error: insertError } = await supabase
+        .from('user_language_settings')
+        .insert({ user_id: user.id, learning_language: language, is_active: true, level: 'A1', level_confirmed_at: null })
+        .select()
+        .single()
+      if (insertError) console.error('activate language:', insertError)
+      activated = inserted
+    }
+
+    if (!activated) {
+      if (updateError) console.error('activate language:', updateError)
+      return
+    }
 
     await supabase
       .from('user_language_settings')
       .update({ is_active: false })
       .eq('user_id', user.id)
+      .neq('learning_language', language)
 
-    const { data, error } = await supabase
-      .from('user_language_settings')
-      .upsert(
-        { user_id: user.id, learning_language: language, is_active: true, level: 'A1' },
-        { onConflict: 'user_id,learning_language' }
-      )
-      .select()
-      .single()
-
-    if (!error && data) setActiveLanguageState(data)
+    setActiveLanguageState(activated)
   }
 
-  return {
+  const value: UserContextValue = {
     user,
     profile,
     activeLanguage,
+    interfaceLang,
+    learningLang,
+    level,
     stats,
     weekActivity,
     isLoading,
@@ -205,11 +273,22 @@ export function useUser(): UseUserReturn {
     setActiveLanguage,
     refetch: fetchAll,
   }
+
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>
 }
 
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
+
+function detectBrowserLang(): InterfaceLang | null {
+  if (typeof navigator === 'undefined') return null
+  for (const tag of navigator.languages ?? [navigator.language]) {
+    const code = tag.toLowerCase().split('-')[0]
+    if ((INTERFACE_LANG_CODES as string[]).includes(code)) return code as InterfaceLang
+  }
+  return null
+}
 
 function getWeekNumber(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))

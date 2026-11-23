@@ -6,7 +6,7 @@ import { Home, BookA, MessageSquareText, Mic2, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/hooks/use-user'
 import { t } from '@/lib/i18n'
-import { DEFAULT_LEARNING_LANG, getLearningLanguage } from '@/lib/languages'
+import { getLearningLanguage } from '@/lib/languages'
 
 const navItems = [
   { href: '/', icon: Home, key: 'home' as const },
@@ -18,9 +18,7 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname()
-  const { profile, activeLanguage } = useUser()
-  const lang = profile?.interface_language ?? 'ru'
-  const learningLang = activeLanguage?.learning_language ?? DEFAULT_LEARNING_LANG
+  const { interfaceLang: lang, learningLang } = useUser()
   const items = navItems.filter(({ href }) => href !== '/alphabet' || getLearningLanguage(learningLang).hasAlphabet)
 
   const hidden = ['/login', '/register'].includes(pathname)

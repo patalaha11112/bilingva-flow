@@ -5,7 +5,7 @@ import { Loader2, Star } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
 import { t } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import type { InterfaceLang, LearningLang, Level } from '@/types/database'
+import type { InterfaceLang } from '@/types/database'
 
 type Phase = 'loading' | 'writing' | 'analyzing' | 'feedback' | 'done_today'
 
@@ -35,11 +35,7 @@ interface FeedbackData {
 }
 
 export default function PracticePage() {
-  const { profile, activeLanguage, isLoading: userLoading } = useUser()
-
-  const lang: InterfaceLang = profile?.interface_language ?? 'ru'
-  const learningLang: LearningLang = activeLanguage?.learning_language ?? 'es'
-  const level: Level = activeLanguage?.level ?? 'A1'
+  const { interfaceLang: lang, learningLang, level, isLoading: userLoading } = useUser()
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [topic, setTopic] = useState('')

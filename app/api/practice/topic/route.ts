@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { InterfaceLang, LearningLang } from '@/types/database'
+import { DEFAULT_INTERFACE_LANG } from '@/lib/languages'
 
 function getISOWeek(date: Date): { week: number; year: number } {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const language = searchParams.get('language') as LearningLang
-    const interfaceLang = (searchParams.get('interface_lang') ?? 'ru') as InterfaceLang
+    const interfaceLang = (searchParams.get('interface_lang') ?? DEFAULT_INTERFACE_LANG) as InterfaceLang
 
     if (!language) return NextResponse.json({ error: 'language is required' }, { status: 400 })
 
@@ -92,7 +93,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!topic) {
-      const options = FALLBACK_TOPICS[interfaceLang] ?? FALLBACK_TOPICS.ru
+      const options = FALLBACK_TOPICS[interfaceLang] ?? FALLBACK_TOPICS[DEFAULT_INTERFACE_LANG]
       topic = options[new Date().getDay() % options.length]
     }
 
