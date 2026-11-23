@@ -196,3 +196,61 @@ export const ESSAY_SCHEMA = {
   },
   required: ['score', 'feedback', 'improvements', 'alternatives', 'fun_fact', 'words_used'],
 }
+
+export function backTranslationPrompt({
+  language,
+  interfaceLanguage,
+  level,
+  original,
+  forward,
+  attempt,
+}: {
+  language: LearningLang
+  interfaceLanguage: InterfaceLang
+  level: Level
+  /** Original sentence in the learning language */
+  original: string
+  /** The student's translation into the interface language (sanitized) */
+  forward: string
+  /** The student's translation of `forward` back into the learning language (sanitized) */
+  attempt: string
+}): string {
+  const langName = getLearningLanguage(language).prompt.name
+  const uiLang = getInterfaceLanguage(interfaceLanguage).promptName
+
+  return `You are a friendly, precise ${langName} teacher. A student at level ${level}, whose native language is ${uiLang}, did a back-translation exercise:
+
+1. Original ${langName} sentence: "${original}"
+2. The student translated it into ${uiLang}: "${forward}"
+3. A day later, without seeing the original, the student translated their own ${uiLang} text back into ${langName}: "${attempt}"
+
+Compare the attempt (3) with the original (1) and help the student learn from the differences. Write all explanations in ${uiLang}.
+
+Rules:
+- A different wording that is correct, natural and keeps the meaning is NOT a mistake. Mention how the original says it as an alternative, and keep the score high.
+- corrections: only real errors (grammar, vocabulary, word order, gender/agreement, accents and other spelling) or places where the meaning drifted. 0–4 items. "yours" is the exact fragment from the attempt, "better" is how the original says it, "why" is one short sentence.
+- If the student's translation in step 2 already changed the meaning, say so in one of the tips.
+- tips: 1–2 short, practical tips about the patterns in this sentence that are worth remembering.
+- praise: one sentence of specific, genuine praise about the attempt.
+- score: 10 = identical or equally correct; 7–9 = small slips; 4–6 = meaning kept but several errors; 1–3 = meaning lost.
+- verdict: "exact" (same as the original, ignoring punctuation), "close" (correct or nearly correct, different wording or small slips), "different" (meaning changed or many errors).`
+}
+
+export const BACK_TRANSLATION_SCHEMA = {
+  type: 'object',
+  properties: {
+    score: { type: 'integer', minimum: 1, maximum: 10 },
+    verdict: { type: 'string', enum: ['exact', 'close', 'different'] },
+    praise: { type: 'string' },
+    corrections: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { yours: { type: 'string' }, better: { type: 'string' }, why: { type: 'string' } },
+        required: ['yours', 'better', 'why'],
+      },
+    },
+    tips: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['score', 'verdict', 'praise', 'corrections', 'tips'],
+}

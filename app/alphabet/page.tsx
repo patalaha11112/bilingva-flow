@@ -8,11 +8,11 @@ import { getAlphabetData, type Letter, type Digraph } from '@/core/alphabet-data
 import { cn } from '@/lib/utils'
 import { getLearningLanguage } from '@/lib/languages'
 import { speak, stopSpeaking } from '@/lib/speech'
+import { PageHeader } from '@/components/page-header'
 
 export default function AlphabetPage() {
   const { interfaceLang, learningLang } = useUser()
   const { t } = useT()
-
 
   const [selected, setSelected] = useState<Letter | Digraph | null>(null)
   const [speaking, setSpeaking] = useState(false)
@@ -42,13 +42,18 @@ export default function AlphabetPage() {
 
   if (!alphabetData) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-20 text-center">
-        <p className="text-sm text-muted-foreground">{t.alphabet.noAlphabet}</p>
-      </div>
+      <>
+        <PageHeader title={t.home.alphabetTitle} />
+        <div className="mx-auto max-w-lg px-4 py-20 text-center">
+          <p className="text-sm text-muted-foreground">{t.alphabet.noAlphabet}</p>
+        </div>
+      </>
     )
   }
 
   return (
+    <>
+    <PageHeader title={t.home.alphabetTitle} />
     <div className="mx-auto max-w-lg px-4 py-6 space-y-5">
 
       {/* ── Header ── */}
@@ -226,6 +231,7 @@ export default function AlphabetPage() {
       </div>
 
     </div>
+    </>
   )
 }
 

@@ -7,6 +7,7 @@ import { ESSAY_SCHEMA, essayPrompt } from '@/lib/server/prompts'
 import { getMessages } from '@/locales'
 import { LIMITS, isAppAdmin, sanitizePromptText } from '@/lib/server/access'
 import { EssayBody, parseBody } from '@/lib/server/validation'
+import { markActivity } from '@/lib/server/activity'
 
 
 function getISOWeek(date: Date): { week: number; year: number } {
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     const parsed = await parseBody(request, EssayBody)
     if (parsed.error) return parsed.error
-    const { content, topic, language, level, interface_language, is_bonus } = parsed.data
+    const { content, topic, language, level, interface_language, is_bonus, tz } = parsed.data
 
     const admin = await isAppAdmin(user.id)
     if (!admin) {
@@ -111,38 +112,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to save essay', detail: essayError.message, code: essayError.code }, { status: 500 })
     }
 
-    // Update daily activity (only for non-bonus essays) — non-fatal
-    if (!is_bonus) {
-      try {
-        const today = new Date().toISOString().split('T')[0]
-
-        const { data: updated } = await supabaseAdmin
-          .from('user_daily_activity')
-          .update({ essay_done: true })
-          .eq('user_id', user.id)
-          .eq('language', language)
-          .eq('date', today)
-          .select('id')
-
-        if (!updated?.length) {
-          await supabaseAdmin
-            .from('user_daily_activity')
-            .insert({
-              user_id: user.id,
-              language,
-              date: today,
-              sentences_done: 0,
-              dialog_done: false,
-              essay_done: true,
-              video_done: false,
-              book_session: false,
-              fully_complete: false,
-            })
-        }
-      } catch (err) {
-        console.error('Daily activity update failed (non-fatal):', err)
-      }
-    }
+    // Today's essay ring (bonus essays don't count)
+    if (!is_bonus) await markActivity(user.id, language, tz, { essayDone: true })
 
     return NextResponse.json({
       essay,

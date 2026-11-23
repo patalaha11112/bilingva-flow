@@ -1,19 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Archive, BookOpen, MessageSquare, PenLine, Video, ChevronLeft } from 'lucide-react'
+import { X, Archive, BookOpen, Repeat2, PenLine, ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { useT } from '@/hooks/use-t'
-import { dayHeading, monthYear, parseLocalDate, weekdaysShort } from '@/lib/format'
+import { useUser } from '@/hooks/use-user'
+import { dayHeading, monthYear, parseLocalDate, toDateString, weekdaysShort } from '@/lib/format'
 
 interface DayActivity {
   date: string
   sentences_done: number
-  dialog_done: boolean
+  back_translation_done: boolean
   essay_done: boolean
-  video_done: boolean
-  fully_complete: boolean
 }
 
 interface ActivityArchiveProps {
@@ -22,6 +21,7 @@ interface ActivityArchiveProps {
 
 export function ActivityArchive({ userId }: ActivityArchiveProps) {
   const { t, locale } = useT()
+  const { learningLang } = useUser()
   const [open, setOpen] = useState(false)
   const [activity, setActivity] = useState<DayActivity[]>([])
   const [loading, setLoading] = useState(false)
@@ -30,7 +30,7 @@ export function ActivityArchive({ userId }: ActivityArchiveProps) {
   useEffect(() => {
     if (!open) return
     fetchActivity()
-  }, [open])
+  }, [open, learningLang]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchActivity() {
     setLoading(true)
@@ -42,9 +42,10 @@ export function ActivityArchive({ userId }: ActivityArchiveProps) {
 
     const { data } = await supabase
       .from('user_daily_activity')
-      .select('*')
+      .select('date, sentences_done, back_translation_done, essay_done')
       .eq('user_id', userId)
-      .gte('date', from.toISOString().split('T')[0])
+      .eq('language', learningLang)
+      .gte('date', toDateString(from))
       .order('date', { ascending: false })
 
     setActivity(data ?? [])
@@ -185,19 +186,14 @@ export function ActivityArchive({ userId }: ActivityArchiveProps) {
               detail={selectedDay.sentences_done > 0 ? `${selectedDay.sentences_done}` : undefined}
             />
             <DayDetailRow
-              icon={<MessageSquare className="h-4 w-4 text-[var(--ring-green)]" />}
-              label={t.activity.dialog}
-              done={selectedDay.dialog_done}
+              icon={<Repeat2 className="h-4 w-4 text-[var(--ring-green)]" />}
+              label={t.activity.backT}
+              done={selectedDay.back_translation_done}
             />
             <DayDetailRow
-              icon={<PenLine className="h-4 w-4 text-muted-foreground" />}
+              icon={<PenLine className="h-4 w-4 text-[var(--ring-orange)]" />}
               label={t.activity.essay}
               done={selectedDay.essay_done}
-            />
-            <DayDetailRow
-              icon={<Video className="h-4 w-4 text-[var(--ring-orange)]" />}
-              label={t.activity.video}
-              done={selectedDay.video_done}
             />
           </div>
         )}
@@ -217,10 +213,9 @@ function MiniRing({ day }: { day: DayActivity }) {
   const r3 = r2 - stroke - 1.5
   const c = (r: number) => 2 * Math.PI * r
 
-  const hasAny = day.sentences_done > 0 || day.dialog_done || day.essay_done || day.video_done
-  const ring1 = hasAny
-  const ring2 = day.dialog_done || day.essay_done
-  const ring3 = day.video_done
+  const ring1 = day.sentences_done > 0
+  const ring2 = day.back_translation_done
+  const ring3 = day.essay_done
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
@@ -298,7 +293,7 @@ function groupByMonth(activity: DayActivity[]) {
         const date = parseLocalDate(dateStr)
         const today = new Date()
         today.setHours(0,0,0,0)
-        cells.push(date <= today ? { date: dateStr, sentences_done: 0, dialog_done: false, essay_done: false, video_done: false, fully_complete: false } : null)
+        cells.push(date <= today ? { date: dateStr, sentences_done: 0, back_translation_done: false, essay_done: false } : null)
       } else {
         cells.push(found)
       }

@@ -2,25 +2,20 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, BookA, MessageSquareText, Mic2, Play } from 'lucide-react'
+import { Home, MessageSquareText, Repeat2, PenLine } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useUser } from '@/hooks/use-user'
 import { useT } from '@/hooks/use-t'
-import { getLearningLanguage } from '@/lib/languages'
 
 const navItems = [
   { href: '/', icon: Home, key: 'home' as const },
-  { href: '/alphabet', icon: BookA, key: 'alphabet' as const },
   { href: '/sentences', icon: MessageSquareText, key: 'sentences' as const },
-  { href: '/practice', icon: Mic2, key: 'practice' as const },
-  { href: '/video', icon: Play, key: 'video' as const },
+  { href: '/back-t', icon: Repeat2, key: 'backT' as const },
+  { href: '/essay', icon: PenLine, key: 'essay' as const },
 ]
 
 export function BottomNav() {
   const pathname = usePathname()
-  const { learningLang } = useUser()
   const { t } = useT()
-  const items = navItems.filter(({ href }) => href !== '/alphabet' || getLearningLanguage(learningLang).hasAlphabet)
 
   const hidden = ['/login', '/register'].includes(pathname)
   if (hidden) return null
@@ -28,7 +23,7 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/80 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-lg items-center justify-around px-2">
-        {items.map(({ href, icon: Icon, key }) => {
+        {navItems.map(({ href, icon: Icon, key }) => {
           const isActive = pathname === href
           return (
             <Link

@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
+import { parseLocalDate, toDateString } from '@/lib/format'
 import {
   DEFAULT_INTERFACE_LANG,
   DEFAULT_LEARNING_LANG,
@@ -41,9 +42,8 @@ interface UserContextValue {
 
 const EMPTY_STATS: UserStats = {
   sentences_completed: 0,
-  dialogs_completed: 0,
+  back_translations_completed: 0,
   essays_completed: 0,
-  videos_completed: 0,
 }
 
 const UserContext = createContext<UserContextValue | null>(null)
@@ -115,55 +115,49 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
       setActiveLanguageState(langData ?? null)
 
-      // Weekly stats
-      const now = new Date()
-      const weekNumber = getWeekNumber(now)
-      const year = now.getFullYear()
+      // This week (Monday to Sunday, local dates) for the active learning language
+      const language = langData?.learning_language ?? DEFAULT_LEARNING_LANG
+      const weekDates = getWeekDates(new Date()).map(toDateString)
+      const todayStr = toDateString(new Date())
+      const weekStartIso = parseLocalDate(weekDates[0]).toISOString()
 
-      const { data: analyticsData } = await supabase
-        .from('user_weekly_analytics')
-        .select('*')
-        .eq('user_id', authUser.id)
-        .eq('week_number', weekNumber)
-        .eq('year', year)
-        .maybeSingle()
+      const [{ data: activityData }, { count: backTCount }, { count: essayCount }] = await Promise.all([
+        supabase
+          .from('user_daily_activity')
+          .select('date, sentences_done, back_translation_done, essay_done')
+          .eq('user_id', authUser.id)
+          .eq('language', language)
+          .in('date', weekDates),
+        supabase
+          .from('back_translations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', authUser.id)
+          .eq('language', language)
+          .gte('back_at', weekStartIso),
+        supabase
+          .from('user_essays')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', authUser.id)
+          .eq('language', language)
+          .gte('created_at', weekStartIso),
+      ])
 
-      setStats(analyticsData
-        ? {
-            sentences_completed: analyticsData.sentences_completed,
-            dialogs_completed: analyticsData.dialogs_completed,
-            essays_completed: analyticsData.essays_completed,
-            videos_completed: analyticsData.videos_completed,
-          }
-        : EMPTY_STATS)
-
-      // Daily activity for week rings
-      const weekDates = getWeekDates(now)
-      const todayStr = now.toISOString().split('T')[0]
-
-      const { data: activityData } = await supabase
-        .from('user_daily_activity')
-        .select('*')
-        .eq('user_id', authUser.id)
-        .in('date', weekDates.map(d => d.toISOString().split('T')[0]))
-
-      const activity: WeekActivity[] = weekDates.map(date => {
-        const dateStr = date.toISOString().split('T')[0]
-        const dayData = activityData?.find(a => a.date === dateStr)
-
-        const hasAny = dayData
-          ? dayData.sentences_done > 0 || dayData.dialog_done || dayData.essay_done || dayData.video_done
-          : false
-
+      setWeekActivity(weekDates.map(date => {
+        const day = activityData?.find(a => a.date === date)
         return {
-          date: dateStr,
-          fully_complete: dayData?.fully_complete ?? false,
-          partially_complete: hasAny && !(dayData?.fully_complete),
-          is_today: dateStr === todayStr,
+          date,
+          sentences: (day?.sentences_done ?? 0) > 0,
+          back_translation: day?.back_translation_done ?? false,
+          essay: day?.essay_done ?? false,
+          is_today: date === todayStr,
         }
-      })
+      }))
 
-      setWeekActivity(activity)
+      setStats({
+        sentences_completed: (activityData ?? []).reduce((sum, d) => sum + (d.sentences_done ?? 0), 0),
+        back_translations_completed: backTCount ?? 0,
+        essays_completed: essayCount ?? 0,
+      })
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -264,14 +258,6 @@ function detectBrowserLang(): InterfaceLang | null {
     if ((INTERFACE_LANG_CODES as string[]).includes(code)) return code as InterfaceLang
   }
   return null
-}
-
-function getWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
 }
 
 // Mon–Sun of the current week

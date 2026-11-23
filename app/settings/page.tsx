@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, LogOut, Sun, Moon } from 'lucide-react'
+import { LogOut, Sun, Moon } from 'lucide-react'
+import { PageHeader } from '@/components/page-header'
 import { useUser } from '@/hooks/use-user'
 import { useT } from '@/hooks/use-t'
 import { LEVELS } from '@/core/constants'
@@ -63,7 +64,7 @@ export default function SettingsPage() {
   if (isLoading) {
     return (
       <>
-        <SettingsHeader onBack={() => router.back()} title={t.settings.title} />
+        <PageHeader title={t.settings.title} />
         <div className="mx-auto max-w-lg px-4 py-6 space-y-4">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />
@@ -75,7 +76,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <SettingsHeader onBack={() => router.back()} title={t.settings.title} />
+      <PageHeader title={t.settings.title} />
 
       <div className="mx-auto max-w-lg px-4 py-6 space-y-4">
 
@@ -248,25 +249,5 @@ function LevelChip({
         {description}
       </span>
     </button>
-  )
-}
-
-// ─────────────────────────────────────────────
-// Sticky back-header
-// ─────────────────────────────────────────────
-
-function SettingsHeader({ onBack, title }: { onBack: () => void; title: string }) {
-  return (
-    <header className="sticky top-14 z-30 border-b border-border bg-background/80 backdrop-blur-lg">
-      <div className="mx-auto flex h-12 max-w-lg items-center gap-3 px-4">
-        <button
-          onClick={onBack}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <h1 className="text-base font-semibold">{title}</h1>
-      </div>
-    </header>
   )
 }

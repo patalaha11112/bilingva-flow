@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Loader2, Star } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
 import { useT } from '@/hooks/use-t'
-import { plural } from '@/lib/format'
+import { getTimeZone, plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 type Phase = 'loading' | 'writing' | 'analyzing' | 'feedback' | 'done_today'
@@ -34,7 +34,7 @@ interface FeedbackData {
   fun_fact: string
 }
 
-export default function PracticePage() {
+export default function EssayPage() {
   const { interfaceLang: lang, learningLang, level, isLoading: userLoading } = useUser()
   const { t, locale } = useT()
 
@@ -58,7 +58,7 @@ export default function PracticePage() {
     setPhase('loading')
     try {
       const res = await fetch(
-        `/api/practice/topic?language=${learningLang}&interface_lang=${lang}`
+        `/api/practice/topic?language=${learningLang}&interface_lang=${lang}&tz=${encodeURIComponent(getTimeZone())}`
       )
       if (!res.ok) throw new Error('Failed')
       const data = await res.json() as {
@@ -90,6 +90,7 @@ export default function PracticePage() {
           level,
           interface_language: lang,
           is_bonus: isBonus,
+          tz: getTimeZone(),
         }),
       })
 
@@ -123,7 +124,7 @@ export default function PracticePage() {
     setIsBonus(true)
     try {
       const res = await fetch(
-        `/api/practice/topic?language=${learningLang}&interface_lang=${lang}`
+        `/api/practice/topic?language=${learningLang}&interface_lang=${lang}&tz=${encodeURIComponent(getTimeZone())}`
       )
       if (res.ok) {
         const data = await res.json() as { topic: string; suggested_words: SuggestedWord[] }

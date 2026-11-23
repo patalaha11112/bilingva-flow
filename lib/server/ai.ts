@@ -20,6 +20,7 @@ const FALLBACK_MODEL = 'gemini-2.5-flash-lite'
 export const AI_MODELS = {
   sentences: process.env.GEMINI_MODEL_SENTENCES || 'gemini-4-hydrogen',
   essay: process.env.GEMINI_MODEL_ESSAY || 'gemini-4-hydrogen',
+  backTranslation: process.env.GEMINI_MODEL_BACK_TRANSLATION || 'gemini-4-hydrogen',
 } as const
 
 const TIMEOUT_MS = 60_000

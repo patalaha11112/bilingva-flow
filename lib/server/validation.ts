@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { DEFAULT_INTERFACE_LANG, INTERFACE_LANG_CODES, LEARNING_LANG_CODES } from '@/lib/languages'
 import { LEVELS } from '@/core/constants'
+import { isValidTimeZone } from '@/lib/server/activity'
 import type { InterfaceLang, LearningLang, Level } from '@/types/database'
 
 // ============================================
@@ -12,6 +13,8 @@ import type { InterfaceLang, LearningLang, Level } from '@/types/database'
 const learningLang = z.enum(LEARNING_LANG_CODES as [LearningLang, ...LearningLang[]])
 const interfaceLang = z.enum(INTERFACE_LANG_CODES as [InterfaceLang, ...InterfaceLang[]])
 const level = z.enum(LEVELS as [Level, ...Level[]])
+/** IANA time zone of the user's device, for "today"; invalid or missing → UTC */
+const timeZone = z.string().max(64).refine(isValidTimeZone).catch('UTC').default('UTC')
 
 export const SentencesBody = z.object({
   language: learningLang,
@@ -27,6 +30,7 @@ export const ProgressBody = z.object({
   sentence_id: z.string().uuid(),
   understood_parts: z.array(z.string().uuid()).max(50),
   language: learningLang,
+  tz: timeZone,
 })
 
 export const EssayBody = z.object({
@@ -36,11 +40,38 @@ export const EssayBody = z.object({
   level,
   interface_language: interfaceLang,
   is_bonus: z.boolean().optional(),
+  tz: timeZone,
+})
+
+export const BackTQuery = z.object({
+  language: learningLang,
+  interface_lang: interfaceLang.catch(DEFAULT_INTERFACE_LANG),
+  level,
+  tz: timeZone,
+  /** How many new sentences to offer today (the level's default up to the daily max) */
+  count: z.coerce.number().int().min(1).max(10).optional(),
+})
+
+export const BackTForwardBody = z.object({
+  sentence_id: z.string().uuid(),
+  text: z.string().trim().min(1).max(1000),
+  language: learningLang,
+  interface_language: interfaceLang,
+  level,
+  tz: timeZone,
+})
+
+export const BackTBackBody = z.object({
+  id: z.string().uuid(),
+  text: z.string().trim().min(1).max(1000),
+  level,
+  tz: timeZone,
 })
 
 export const TopicQuery = z.object({
   language: learningLang,
   interface_lang: interfaceLang.catch(DEFAULT_INTERFACE_LANG),
+  tz: timeZone,
 })
 
 export const TipsQuery = z.object({

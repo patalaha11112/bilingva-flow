@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { localized } from '@/lib/languages'
 import { getMessages } from '@/locales'
 import { getWeekStart } from '@/lib/server/access'
+import { localDate } from '@/lib/server/activity'
 import { TopicQuery, parseQuery } from '@/lib/server/validation'
 
 function getISOWeek(date: Date): { week: number; year: number } {
@@ -24,9 +25,9 @@ export async function GET(request: NextRequest) {
 
     const parsed = parseQuery(request.nextUrl.searchParams, TopicQuery)
     if (parsed.error) return parsed.error
-    const { language, interface_lang: uiLang } = parsed.data
+    const { language, interface_lang: uiLang, tz } = parsed.data
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = localDate(tz)
     const { week, year } = getISOWeek(new Date())
 
     // Check if essay done today (non-bonus)

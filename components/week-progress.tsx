@@ -24,11 +24,11 @@ export function WeekProgress({ activity }: WeekProgressProps) {
           </div>
           <div className="flex items-center gap-1.5">
             <div className="h-2 w-2 rounded-full bg-[var(--ring-green)]" />
-            <span>{t.home.legend.dialog}</span>
+            <span>{t.home.legend.backT}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="h-2 w-2 rounded-full bg-[var(--ring-orange)]" />
-            <span>{t.home.legend.video}</span>
+            <span>{t.home.legend.essay}</span>
           </div>
         </div>
       </div>
@@ -71,12 +71,10 @@ function DayRing({ day }: { day: WeekActivity }) {
 
   const circ = (r: number) => 2 * Math.PI * r
 
-  // fully_complete: all three rings filled
-  // partially_complete: only the outer ring (any exercise done)
-  // empty day: nothing
-  const sentenceFill = day.fully_complete || day.partially_complete
-  const dialogFill = day.fully_complete
-  const videoFill = day.fully_complete
+  // Outer: sentences, middle: Back-T, inner: essay
+  const sentenceFill = day.sentences
+  const backTFill = day.back_translation
+  const essayFill = day.essay
 
   return (
     <svg
@@ -104,7 +102,7 @@ function DayRing({ day }: { day: WeekActivity }) {
         fill="none" stroke="var(--ring-green)" strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeDasharray={circ(middleRadius)}
-        strokeDashoffset={dialogFill ? 0 : circ(middleRadius)}
+        strokeDashoffset={backTFill ? 0 : circ(middleRadius)}
         className="transition-all duration-700 ease-out delay-100"
       />
       <circle
@@ -112,7 +110,7 @@ function DayRing({ day }: { day: WeekActivity }) {
         fill="none" stroke="var(--ring-orange)" strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeDasharray={circ(innerRadius)}
-        strokeDashoffset={videoFill ? 0 : circ(innerRadius)}
+        strokeDashoffset={essayFill ? 0 : circ(innerRadius)}
         className="transition-all duration-700 ease-out delay-200"
       />
     </svg>

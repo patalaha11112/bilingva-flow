@@ -35,6 +35,17 @@ export function dayHeading(locale: string, date: Date): string {
   )
 }
 
+/** IANA time zone of this device, sent to the API so "today" is the user's day */
+export function getTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
+/** 'YYYY-MM-DD' of a local date (toISOString would shift it to UTC) */
+export function toDateString(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
 /** Parses 'YYYY-MM-DD' as a local date (new Date('YYYY-MM-DD') would be UTC) */
 export function parseLocalDate(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number)

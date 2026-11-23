@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lightbulb } from 'lucide-react'
+import { BookA, ChevronRight, Lightbulb } from 'lucide-react'
 import Link from 'next/link'
 import { useUser } from '@/hooks/use-user'
 import { WeekProgress } from '@/components/week-progress'
 import { useT } from '@/hooks/use-t'
+import { getLearningLanguage } from '@/lib/languages'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HomeTopSection } from '@/components/home-top-section'
@@ -56,6 +57,23 @@ export default function Home() {
         level={level}
         stats={stats}
       />
+
+      {/* Alphabet */}
+      {getLearningLanguage(learningLang).hasAlphabet && (
+        <Link
+          href="/alphabet"
+          className="flex items-center gap-3 rounded-2xl bg-card p-4 shadow-sm transition-colors hover:bg-accent active:scale-[0.99]"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <BookA className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">{t.home.alphabetTitle}</p>
+            <p className="text-xs text-muted-foreground">{t.home.alphabetSubtitle}</p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
+      )}
 
       {/* Week rings */}
       <section className="rounded-2xl bg-card p-4 shadow-sm">

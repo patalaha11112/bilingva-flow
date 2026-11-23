@@ -222,7 +222,9 @@ export interface UserDailyActivity {
   dialog_done: boolean
   essay_done: boolean
   video_done: boolean
+  back_translation_done: boolean
   book_session: boolean
+  /** Generated: sentences + Back-T + essay done */
   fully_complete: boolean
   created_at: string
   updated_at: string
@@ -332,18 +334,20 @@ export interface GeneratedSentencePart {
 }
 
 // Статистика для главной страницы
+// Weekly counts for the home page
 export interface UserStats {
   sentences_completed: number
-  dialogs_completed: number
+  back_translations_completed: number
   essays_completed: number
-  videos_completed: number
 }
 
 // Активность за неделю для кружочков
+// One day of the week rings: one ring per exercise
 export interface WeekActivity {
   date: string
-  fully_complete: boolean
-  partially_complete: boolean // хотя бы одно упражнение
+  sentences: boolean
+  back_translation: boolean
+  essay: boolean
   is_today: boolean
 }
 

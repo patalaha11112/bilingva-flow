@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { getTimeZone } from '@/lib/format'
 import type {
   SentenceWithParts,
   UserSentence,
@@ -153,7 +154,7 @@ export function useSentences({
         const res = await fetch('/api/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sentence_id: sentenceId, understood_parts: parts, language }),
+          body: JSON.stringify({ sentence_id: sentenceId, understood_parts: parts, language, tz: getTimeZone() }),
         })
         if (!res.ok) console.error('save progress:', res.status, await res.text())
       } catch (err) {

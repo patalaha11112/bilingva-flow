@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight, BookOpen, MessageSquare, PenLine, Video } from 'lucide-react'
+import { ChevronRight, BookOpen, Repeat2, PenLine } from 'lucide-react'
 import type { LearningLang, Level } from '@/types/database'
 import { useT } from '@/hooks/use-t'
 import { getLearningLanguage } from '@/lib/languages'
@@ -11,9 +11,8 @@ interface HomeTopSectionProps {
   level: Level
   stats: {
     sentences_completed: number
-    dialogs_completed: number
+    back_translations_completed: number
     essays_completed: number
-    videos_completed: number
   }
 }
 
@@ -47,9 +46,8 @@ export function HomeTopSection({ learningLang, level, stats }: HomeTopSectionPro
       {/* Right card: stats */}
       <div className="flex-1 rounded-2xl bg-card p-4 shadow-sm flex flex-col justify-between gap-2">
         <StatRow icon={<BookOpen className="h-3.5 w-3.5 text-[var(--ring-blue)]" />} label={t.home.stats.sentences} value={stats.sentences_completed} />
-        <StatRow icon={<MessageSquare className="h-3.5 w-3.5 text-[var(--ring-green)]" />} label={t.home.stats.dialogs} value={stats.dialogs_completed} />
-        <StatRow icon={<PenLine className="h-3.5 w-3.5 text-muted-foreground" />} label={t.home.stats.essays} value={stats.essays_completed} />
-        <StatRow icon={<Video className="h-3.5 w-3.5 text-[var(--ring-orange)]" />} label={t.home.stats.videos} value={stats.videos_completed} />
+        <StatRow icon={<Repeat2 className="h-3.5 w-3.5 text-[var(--ring-green)]" />} label={t.home.stats.backT} value={stats.back_translations_completed} />
+        <StatRow icon={<PenLine className="h-3.5 w-3.5 text-[var(--ring-orange)]" />} label={t.home.stats.essays} value={stats.essays_completed} />
       </div>
 
     </section>
