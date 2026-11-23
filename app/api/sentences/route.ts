@@ -13,6 +13,7 @@ import {
   isUuid,
   sanitizePromptText,
 } from "@/lib/server/access";
+import { TOPIC_NAME_COLUMNS, pickTopicName } from "@/lib/server/db-l10n";
 import type {
   LearningLang,
   Level,
@@ -330,17 +331,12 @@ async function getNewSentences(
     if (!topicName && topicId) {
       const { data: topicData } = await supabase
         .from("topics")
-        .select("name_ru, name_en, name_es")
+        .select(TOPIC_NAME_COLUMNS)
         .eq("id", topicId)
         .single();
 
       if (topicData) {
-        topicName =
-          interfaceLanguage === "ru"
-            ? topicData.name_ru
-            : interfaceLanguage === "es"
-              ? topicData.name_es
-              : topicData.name_en;
+        topicName = pickTopicName(topicData, interfaceLanguage);
       }
     }
 

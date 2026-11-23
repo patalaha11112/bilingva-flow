@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation'
 import { Volume2, ChevronRight, Check, Plus, ArrowLeft, Loader2, RefreshCw } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
 import { useSentences } from '@/hooks/use-sentences'
-import { t } from '@/lib/i18n'
+import { useT } from '@/hooks/use-t'
 import { cn } from '@/lib/utils'
 import { getLearningLanguage, type LearningLang } from '@/lib/languages'
 import { speak } from '@/lib/speech'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { SentenceWithParts, SentencePart, InterfaceLang, Level } from '@/types/database'
+import type { SentenceWithParts, SentencePart, Level } from '@/types/database'
 
 // ─────────────────────────────────────────────
 // MAIN PAGE
@@ -52,9 +52,9 @@ export default function SentencesPage() {
 
   if (userLoading || isLoading) return <SentencesSkeleton />
 
-  if (error) return <ErrorState message={error} onRetry={refetch} lang={lang} />
+  if (error) return <ErrorState message={error} onRetry={refetch} />
 
-  if (isGenerating) return <GeneratingState lang={lang} level={level} />
+  if (isGenerating) return <GeneratingState level={level} />
 
   if (mode === 'train') {
     return (
@@ -62,7 +62,6 @@ export default function SentencesPage() {
         sentences={sentences}
         currentIndex={trainIndex}
         userProgress={userProgress}
-        lang={lang}
         level={level}
         onMarkPart={markPartUnderstood}
         onMarkAll={markAllUnderstood}
@@ -86,7 +85,6 @@ export default function SentencesPage() {
     <ListView
       sentences={sentences}
       userProgress={userProgress}
-      lang={lang}
       level={level}
       language={language}
       isGenerating={isGenerating}
@@ -104,61 +102,12 @@ export default function SentencesPage() {
 }
 
 // ─────────────────────────────────────────────
-// LIST VIEW — список предложений недели
+// LIST VIEW — this week's sentences
 // ─────────────────────────────────────────────
-
-const UI: Record<string, Record<string, string>> = {
-  ru: {
-    title: 'Предложения недели',
-    train: 'Тренироваться',
-    addMore: '+ Добавить ещё одно',
-    noSentences: 'Нет предложений',
-    understood: 'Понял',
-    hint: 'Прочитай каждую часть. Отметь те которые ты понимаешь без перевода — даже если ещё не используешь в речи. Это уже пассивная память — и это отличный старт!',
-    allUnderstood: 'Всё понятно',
-    next: 'Следующее предложение',
-    back: 'Назад',
-    generating: 'Генерируем предложения для тебя...',
-    generatingHint: 'Это займёт несколько секунд',
-    progress: 'Прогресс',
-    done: 'Готово',
-  },
-  en: {
-    title: 'Weekly Sentences',
-    train: 'Start Training',
-    addMore: '+ Add one more',
-    noSentences: 'No sentences',
-    understood: 'Got it',
-    hint: 'Read each part. Mark the ones you understand without translation — even if you don\'t use them yet. That\'s already passive memory — a great start!',
-    allUnderstood: 'All clear',
-    next: 'Next sentence',
-    back: 'Back',
-    generating: 'Generating sentences for you...',
-    generatingHint: 'This will take a few seconds',
-    progress: 'Progress',
-    done: 'Done',
-  },
-  es: {
-    title: 'Oraciones de la semana',
-    train: 'Entrenar',
-    addMore: '+ Añadir una más',
-    noSentences: 'Sin oraciones',
-    understood: 'Entendido',
-    hint: 'Lee cada parte. Marca las que entiendes sin traducción — aunque aún no las uses. Eso ya es memoria pasiva — ¡un gran comienzo!',
-    allUnderstood: 'Todo claro',
-    next: 'Siguiente oración',
-    back: 'Atrás',
-    generating: 'Generando oraciones para ti...',
-    generatingHint: 'Esto tomará unos segundos',
-    progress: 'Progreso',
-    done: 'Listo',
-  },
-}
 
 function ListView({
   sentences,
   userProgress,
-  lang,
   level,
   language,
   isGenerating,
@@ -171,7 +120,6 @@ function ListView({
 }: {
   sentences: SentenceWithParts[]
   userProgress: Record<string, any>
-  lang: InterfaceLang
   level: Level
   language: LearningLang
   isGenerating: boolean
@@ -182,8 +130,8 @@ function ListView({
   onAddMore: () => void
   onRefresh: () => void
 }) {
-  const ui = UI[lang] ?? UI.ru
-  const MAX_SENTENCES = 10
+  const { t } = useT()
+  const ui = t.sentences
   const canAddMore = weeklyCount < weeklyLimit && !limitReached
 
   return (
@@ -202,7 +150,7 @@ function ListView({
             onClick={onRefresh}
             disabled={isGenerating || limitReached}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={lang === 'ru' ? 'Обновить предложения' : lang === 'es' ? 'Actualizar sugerencias' : 'Refresh suggestions'}
+            title={ui.refresh}
           >
             <RefreshCw className={cn('h-4 w-4', isGenerating && 'animate-spin')} />
           </button>
@@ -279,7 +227,7 @@ function ListView({
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              {lang === 'ru' ? 'Генерируем...' : lang === 'es' ? 'Generando...' : 'Generating...'}
+              {ui.generatingShort}
             </>
           ) : (
             ui.addMore
@@ -287,9 +235,7 @@ function ListView({
         </button>
       ) : (
         <div className="w-full rounded-2xl border border-dashed border-amber-500/30 bg-amber-500/5 py-3 px-4 text-sm text-amber-700 dark:text-amber-400 text-center">
-          {limitReached
-            ? (lang === 'ru' ? 'Лимит предложений на эту неделю исчерпан. Новые — с понедельника' : lang === 'es' ? 'Has alcanzado el límite de esta semana. Habrá nuevas el lunes' : 'This week\'s sentence limit is used up. New ones on Monday')
-            : (lang === 'ru' ? 'Лимит достигнут. Нажмите обновить для новых предложений' : lang === 'es' ? 'Límite alcanzado. Haz clic en actualizar para nuevas oraciones' : 'Limit reached. Click refresh for new sentences')}
+          {limitReached ? ui.weeklyLimitReached : ui.activeLimitReached}
         </div>
       )}
 
@@ -308,14 +254,13 @@ function ListView({
 }
 
 // ─────────────────────────────────────────────
-// TRAIN VIEW — тренировка одного предложения
+// TRAIN VIEW — one sentence at a time
 // ─────────────────────────────────────────────
 
 function TrainView({
   sentences,
   currentIndex,
   userProgress,
-  lang,
   level,
   onMarkPart,
   onMarkAll,
@@ -325,14 +270,14 @@ function TrainView({
   sentences: SentenceWithParts[]
   currentIndex: number
   userProgress: Record<string, any>
-  lang: InterfaceLang
   level: Level
   onMarkPart: (sentenceId: string, partId: string) => Promise<void>
   onMarkAll: (sentenceId: string) => Promise<void>
   onNext: () => void
   onBack: () => void
 }) {
-  const ui = UI[lang] ?? UI.ru
+  const { t } = useT()
+  const ui = t.sentences
   const sentence = sentences[currentIndex]
   const [showBreakdown, setShowBreakdown] = useState(false)
   const isLastSentence = currentIndex === sentences.length - 1
@@ -395,7 +340,7 @@ function TrainView({
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
           >
             <Volume2 className="h-3.5 w-3.5" />
-            {lang === 'ru' ? 'Послушать' : lang === 'es' ? 'Escuchar' : 'Listen'}
+            {t.common.listen}
           </button>
         </div>
 
@@ -406,7 +351,7 @@ function TrainView({
             className="w-full"
             onClick={() => setShowBreakdown(true)}
           >
-            {lang === 'ru' ? 'Показать разбор' : lang === 'es' ? 'Ver análisis' : 'Show breakdown'}
+            {ui.showBreakdown}
           </Button>
         )}
 
@@ -429,7 +374,6 @@ function TrainView({
                   key={part.id}
                   part={part}
                   isUnderstood={isUnderstood}
-                  lang={lang}
                   learningLang={sentence.language}
                   onTap={() => onMarkPart(sentence.id, part.id)}
                   onSpeak={() => speak(part.text, sentence.language)}
@@ -455,11 +399,7 @@ function TrainView({
             {/* Encouragement for low levels */}
             {isLowLevel && (
               <p className="text-center text-xs text-muted-foreground">
-                {lang === 'ru'
-                  ? 'На начальном уровне нормально не понимать всё — каждая галочка это прогресс! 🎉'
-                  : lang === 'es'
-                  ? 'En nivel inicial es normal no entenderlo todo — ¡cada ✓ es progreso! 🎉'
-                  : 'At beginner level it\'s normal not to understand everything — every ✓ is progress! 🎉'}
+                {ui.lowLevelEncouragement}
               </p>
             )}
           </div>
@@ -473,7 +413,7 @@ function TrainView({
           onClick={onNext}
         >
           {isLastSentence
-            ? (lang === 'ru' ? 'Завершить' : lang === 'es' ? 'Finalizar' : 'Finish')
+            ? ui.finish
             : ui.next}
           <ChevronRight className="ml-1 h-4 w-4" />
         </Button>
@@ -490,14 +430,12 @@ function TrainView({
 function PartCard({
   part,
   isUnderstood,
-  lang,
   learningLang,
   onTap,
   onSpeak,
 }: {
   part: SentencePart
   isUnderstood: boolean
-  lang: InterfaceLang
   learningLang: string
   onTap: () => void
   onSpeak: () => void
@@ -567,8 +505,9 @@ function PartCard({
 // GENERATING STATE
 // ─────────────────────────────────────────────
 
-function GeneratingState({ lang, level }: { lang: InterfaceLang; level: Level }) {
-  const ui = UI[lang] ?? UI.ru
+function GeneratingState({ level }: { level: Level }) {
+  const { t } = useT()
+  const ui = t.sentences
   const isLow = ['A1', 'A2'].includes(level)
 
   return (
@@ -580,11 +519,7 @@ function GeneratingState({ lang, level }: { lang: InterfaceLang; level: Level })
       </div>
       {isLow && (
         <p className="text-xs text-muted-foreground max-w-[240px]">
-          {lang === 'ru'
-            ? 'Подбираем предложения специально для твоего уровня 🎯'
-            : lang === 'es'
-            ? 'Preparando oraciones para tu nivel 🎯'
-            : 'Preparing sentences for your level 🎯'}
+          {ui.generatingLowLevel}
         </p>
       )}
     </div>
@@ -615,22 +550,21 @@ function SentencesSkeleton() {
 function ErrorState({
   message,
   onRetry,
-  lang,
 }: {
   message: string
   onRetry: () => void
-  lang: string
 }) {
+  const { t } = useT()
   return (
     <div className="mx-auto max-w-lg px-4 py-20 text-center space-y-4">
       <div className="rounded-2xl bg-destructive/10 p-4 border border-destructive/20 text-destructive text-sm text-left whitespace-pre-wrap break-all">
         <p className="font-semibold mb-1">
-          {lang === 'ru' ? '⚠️ Ошибка:' : lang === 'es' ? '⚠️ Error:' : '⚠️ Error:'}
+          ⚠️ {t.common.error}:
         </p>
         {message}
       </div>
       <Button onClick={onRetry} className="w-full h-11 text-sm font-medium">
-        {lang === 'ru' ? 'Попробовать снова' : lang === 'es' ? 'Reintentar' : 'Try Again'}
+        {t.common.tryAgain}
       </Button>
     </div>
   )

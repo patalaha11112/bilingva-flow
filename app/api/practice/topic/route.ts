@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { InterfaceLang, LearningLang } from '@/types/database'
 import { DEFAULT_INTERFACE_LANG } from '@/lib/languages'
+import { getMessages } from '@/locales'
+import { getWeekStart, isInterfaceLang, isLearningLang } from '@/lib/server/access'
+import { TOPIC_NAME_COLUMNS, pickPartTranslation, pickTopicName } from '@/lib/server/db-l10n'
 
 function getISOWeek(date: Date): { week: number; year: number } {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
@@ -12,18 +15,6 @@ function getISOWeek(date: Date): { week: number; year: number } {
   return { week, year: d.getUTCFullYear() }
 }
 
-const FALLBACK_TOPICS: Record<InterfaceLang, string[]> = {
-  ru: ['Мой обычный день', 'Мои увлечения', 'Моя семья', 'Еда которую я люблю', 'Моё любимое место'],
-  en: ['My typical day', 'My hobbies', 'My family', 'Food I love', 'My favourite place'],
-  es: ['Mi día típico', 'Mis pasatiempos', 'Mi familia', 'Comida que amo', 'Mi lugar favorito'],
-}
-
-// Monday 00:00 UTC of the current week (user_sentences has no week columns)
-function getWeekStart(date: Date = new Date()): string {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() || 7) - 1))
-  return d.toISOString()
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +27,8 @@ export async function GET(request: NextRequest) {
     const language = searchParams.get('language') as LearningLang
     const interfaceLang = (searchParams.get('interface_lang') ?? DEFAULT_INTERFACE_LANG) as InterfaceLang
 
-    if (!language) return NextResponse.json({ error: 'language is required' }, { status: 400 })
+    if (!isLearningLang(language)) return NextResponse.json({ error: 'Invalid language' }, { status: 400 })
+    const uiLang = isInterfaceLang(interfaceLang) ? interfaceLang : DEFAULT_INTERFACE_LANG
 
     const today = new Date().toISOString().split('T')[0]
     const { week, year } = getISOWeek(new Date())
@@ -83,21 +75,19 @@ export async function GET(request: NextRequest) {
         if (topTopicId) {
           const { data: topicData } = await supabase
             .from('topics')
-            .select('name_ru, name_en, name_es')
+            .select(TOPIC_NAME_COLUMNS)
             .eq('id', topTopicId)
             .single()
 
           if (topicData) {
-            topic = interfaceLang === 'ru' ? topicData.name_ru
-                  : interfaceLang === 'es' ? topicData.name_es
-                  : topicData.name_en
+            topic = pickTopicName(topicData, uiLang)
           }
         }
       }
     }
 
     if (!topic) {
-      const options = FALLBACK_TOPICS[interfaceLang] ?? FALLBACK_TOPICS[DEFAULT_INTERFACE_LANG]
+      const options = getMessages(uiLang).server.fallbackTopics
       topic = options[new Date().getDay() % options.length]
     }
 
@@ -136,9 +126,7 @@ export async function GET(request: NextRequest) {
           const lc = p.text.toLowerCase()
           if (seen.has(lc)) continue
           seen.add(lc)
-          const translation = interfaceLang === 'ru'
-            ? p.translation_ru
-            : ((p.translation_en as string | null) ?? p.translation_ru)
+          const translation = pickPartTranslation(p, uiLang)
           suggestedWords.push({ text: p.text, translation })
         }
       }

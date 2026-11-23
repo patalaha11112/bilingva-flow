@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { X, Archive, BookOpen, MessageSquare, PenLine, Video, ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import type { InterfaceLang } from '@/types/database'
+import { useT } from '@/hooks/use-t'
+import { dayHeading, monthYear, parseLocalDate, weekdaysShort } from '@/lib/format'
 
 interface DayActivity {
   date: string
@@ -16,23 +17,11 @@ interface DayActivity {
 }
 
 interface ActivityArchiveProps {
-  lang: InterfaceLang
   userId: string
 }
 
-const DAY_LABELS: Record<InterfaceLang, string[]> = {
-  ru: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
-  en: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
-  es: ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'],
-}
-
-const MONTH_LABELS: Record<InterfaceLang, string[]> = {
-  ru: ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'],
-  en: ['January','February','March','April','May','June','July','August','September','October','November','December'],
-  es: ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
-}
-
-export function ActivityArchive({ lang, userId }: ActivityArchiveProps) {
+export function ActivityArchive({ userId }: ActivityArchiveProps) {
+  const { t, locale } = useT()
   const [open, setOpen] = useState(false)
   const [activity, setActivity] = useState<DayActivity[]>([])
   const [loading, setLoading] = useState(false)
@@ -47,7 +36,7 @@ export function ActivityArchive({ lang, userId }: ActivityArchiveProps) {
     setLoading(true)
     const supabase = createClient()
 
-    // Берём последние 90 дней
+    // Last 90 days
     const from = new Date()
     from.setDate(from.getDate() - 90)
 
@@ -62,12 +51,12 @@ export function ActivityArchive({ lang, userId }: ActivityArchiveProps) {
     setLoading(false)
   }
 
-  // Группируем по месяцам
+  // Grouped by month
   const grouped = groupByMonth(activity)
 
   return (
     <>
-      {/* Кнопка архива */}
+      {/* Archive button */}
       <button
         onClick={() => setOpen(true)}
         className="flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -96,7 +85,7 @@ export function ActivityArchive({ lang, userId }: ActivityArchiveProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-border">
           <h2 className="text-base font-semibold">
-            {lang === 'ru' ? 'Архив активности' : lang === 'en' ? 'Activity Archive' : 'Archivo de actividad'}
+            {t.activity.archiveTitle}
           </h2>
           <button
             onClick={() => { setOpen(false); setSelectedDay(null) }}
@@ -120,19 +109,19 @@ export function ActivityArchive({ lang, userId }: ActivityArchiveProps) {
 
           {!loading && activity.length === 0 && (
             <p className="text-center text-sm text-muted-foreground py-8">
-              {lang === 'ru' ? 'Пока нет данных' : lang === 'en' ? 'No data yet' : 'Sin datos aún'}
+              {t.activity.noData}
             </p>
           )}
 
           {!loading && grouped.map(({ month, year, days }) => (
             <div key={`${year}-${month}`}>
               <h3 className="text-sm font-medium text-muted-foreground mb-3">
-                {MONTH_LABELS[lang][month]} {year}
+                {monthYear(locale, year, month)}
               </h3>
 
               {/* Day labels */}
               <div className="grid grid-cols-7 mb-1">
-                {DAY_LABELS[lang].map(d => (
+                {weekdaysShort(locale).map(d => (
                   <div key={d} className="text-center text-[10px] text-muted-foreground/60">{d}</div>
                 ))}
               </div>
@@ -150,7 +139,7 @@ export function ActivityArchive({ lang, userId }: ActivityArchiveProps) {
                           >
                             <MiniRing day={day} />
                             <span className="text-[9px] text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
-                              {new Date(day.date + 'T00:00:00').getDate()}
+                              {parseLocalDate(day.date).getDate()}
                             </span>
                           </button>
                         ) : (
@@ -183,7 +172,7 @@ export function ActivityArchive({ lang, userId }: ActivityArchiveProps) {
             <ChevronLeft className="h-4 w-4" />
           </button>
           <h2 className="text-base font-semibold">
-            {selectedDay ? formatDate(selectedDay.date, lang) : ''}
+            {selectedDay ? dayHeading(locale, parseLocalDate(selectedDay.date)) : ''}
           </h2>
         </div>
 
@@ -191,23 +180,23 @@ export function ActivityArchive({ lang, userId }: ActivityArchiveProps) {
           <div className="px-5 py-4 space-y-3 pb-10">
             <DayDetailRow
               icon={<BookOpen className="h-4 w-4 text-[var(--ring-blue)]" />}
-              label={lang === 'ru' ? 'Предложения' : lang === 'en' ? 'Sentences' : 'Oraciones'}
+              label={t.activity.sentences}
               done={selectedDay.sentences_done > 0}
               detail={selectedDay.sentences_done > 0 ? `${selectedDay.sentences_done}` : undefined}
             />
             <DayDetailRow
               icon={<MessageSquare className="h-4 w-4 text-[var(--ring-green)]" />}
-              label={lang === 'ru' ? 'Диалог' : lang === 'en' ? 'Dialog' : 'Diálogo'}
+              label={t.activity.dialog}
               done={selectedDay.dialog_done}
             />
             <DayDetailRow
               icon={<PenLine className="h-4 w-4 text-muted-foreground" />}
-              label={lang === 'ru' ? 'Эссе' : lang === 'en' ? 'Essay' : 'Ensayo'}
+              label={t.activity.essay}
               done={selectedDay.essay_done}
             />
             <DayDetailRow
               icon={<Video className="h-4 w-4 text-[var(--ring-orange)]" />}
-              label={lang === 'ru' ? 'Видео' : lang === 'en' ? 'Video' : 'Video'}
+              label={t.activity.video}
               done={selectedDay.video_done}
             />
           </div>
@@ -291,11 +280,10 @@ function groupByMonth(activity: DayActivity[]) {
   return Array.from(map.entries()).map(([key, days]) => {
     const [year, month] = key.split('-').map(Number)
 
-    // Строим сетку месяца (пн-вс)
+    // Month grid, Monday to Sunday
     const firstDay = new Date(year, month - 1, 1)
     const lastDay = new Date(year, month, 0)
 
-    // Начало с понедельника
     let startOffset = firstDay.getDay() - 1
     if (startOffset < 0) startOffset = 6
 
@@ -305,9 +293,9 @@ function groupByMonth(activity: DayActivity[]) {
     for (let d = 1; d <= totalDays; d++) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
       const found = days.find(a => a.date === dateStr) ?? null
-      // Показываем даже пустые дни если они в прошлом
+      // Past days without activity are shown as empty rings
       if (!found) {
-        const date = new Date(dateStr)
+        const date = parseLocalDate(dateStr)
         const today = new Date()
         today.setHours(0,0,0,0)
         cells.push(date <= today ? { date: dateStr, sentences_done: 0, dialog_done: false, essay_done: false, video_done: false, fully_complete: false } : null)
@@ -316,7 +304,7 @@ function groupByMonth(activity: DayActivity[]) {
       }
     }
 
-    // Разбиваем на недели
+    // Split into weeks
     const weeks: (DayActivity | null)[][] = []
     for (let i = 0; i < cells.length; i += 7) {
       const week = cells.slice(i, i + 7)
@@ -326,12 +314,4 @@ function groupByMonth(activity: DayActivity[]) {
 
     return { month: month - 1, year, days: weeks }
   })
-}
-
-function formatDate(dateStr: string, lang: InterfaceLang): string {
-  const date = new Date(dateStr + 'T00:00:00')
-  const day = date.getDate()
-  const month = MONTH_LABELS[lang][date.getMonth()]
-  const weekDay = DAY_LABELS[lang][(date.getDay() + 6) % 7]
-  return `${weekDay}, ${day} ${month}`
 }

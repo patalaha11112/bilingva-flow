@@ -3,14 +3,15 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { Volume2, Square } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
+import { useT } from '@/hooks/use-t'
 import { getAlphabetData, type Letter, type Digraph } from '@/core/alphabet-data'
 import { cn } from '@/lib/utils'
 import { getLearningLanguage } from '@/lib/languages'
 import { speak, stopSpeaking } from '@/lib/speech'
-import type { InterfaceLang } from '@/types/database'
 
 export default function AlphabetPage() {
   const { interfaceLang, learningLang } = useUser()
+  const { t } = useT()
 
 
   const [selected, setSelected] = useState<Letter | Digraph | null>(null)
@@ -42,7 +43,7 @@ export default function AlphabetPage() {
   if (!alphabetData) {
     return (
       <div className="mx-auto max-w-lg px-4 py-20 text-center">
-        <p className="text-sm text-muted-foreground">{uiText.noAlphabet[interfaceLang]}</p>
+        <p className="text-sm text-muted-foreground">{t.alphabet.noAlphabet}</p>
       </div>
     )
   }
@@ -57,7 +58,7 @@ export default function AlphabetPage() {
           {alphabetData.title[interfaceLang]}
         </h1>
         <p className="text-sm text-muted-foreground">
-          {uiText.subtitle[interfaceLang]}
+          {t.alphabet.subtitle}
         </p>
       </div>
 
@@ -86,7 +87,7 @@ export default function AlphabetPage() {
         <div className="space-y-3 pt-1 border-t border-border/60">
           <div className="flex items-baseline gap-2 flex-wrap">
             <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground/50">
-              {uiText.digraphs[interfaceLang]}
+              {t.alphabet.digraphs}
             </p>
             <p className="text-[0.65rem] italic text-muted-foreground/40">
               {alphabetData.digraphNote[interfaceLang]}
@@ -119,7 +120,7 @@ export default function AlphabetPage() {
               Aa
             </span>
             <p className="mt-3 text-sm text-muted-foreground">
-              {uiText.selectHint[interfaceLang]}
+              {t.alphabet.selectHint}
             </p>
           </div>
         ) : (
@@ -142,7 +143,7 @@ export default function AlphabetPage() {
                 {/* Special badge */}
                 {isSpecial(selected) && (
                   <span className="inline-block rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[0.58rem] font-semibold uppercase tracking-widest text-primary">
-                    {uiText.hasQuirks[interfaceLang]}
+                    {t.alphabet.hasQuirks}
                   </span>
                 )}
 
@@ -157,7 +158,7 @@ export default function AlphabetPage() {
                     )}
                   >
                     <Volume2 className="h-3 w-3" />
-                    {uiText.playLetter[interfaceLang]}
+                    {t.alphabet.playLetter}
                   </button>
                   <button
                     onClick={() => say(selected.name)}
@@ -168,14 +169,14 @@ export default function AlphabetPage() {
                     )}
                   >
                     <Volume2 className="h-3 w-3" />
-                    {uiText.playName[interfaceLang]}
+                    {t.alphabet.playName}
                   </button>
                   <button
                     onClick={stop}
                     className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-all cursor-pointer hover:text-foreground hover:border-border/80"
                   >
                     <Square className="h-3 w-3" />
-                    {uiText.stop[interfaceLang]}
+                    {t.alphabet.stop}
                   </button>
                 </div>
               </div>
@@ -183,7 +184,7 @@ export default function AlphabetPage() {
 
             {/* How it sounds */}
             <section className="space-y-1.5">
-              <SectionLabel>{uiText.how[interfaceLang]}</SectionLabel>
+              <SectionLabel>{t.alphabet.how}</SectionLabel>
               <p className="text-[0.9rem] leading-relaxed text-foreground/75">
                 {selected.how[interfaceLang]}
               </p>
@@ -191,7 +192,7 @@ export default function AlphabetPage() {
 
             {/* Examples */}
             <section className="space-y-1.5">
-              <SectionLabel>{uiText.examples[interfaceLang]}</SectionLabel>
+              <SectionLabel>{t.alphabet.examples}</SectionLabel>
               <ul className="space-y-1">
                 {selected.examples.map((ex) => (
                   <li key={ex.word} className="flex items-center gap-2 text-[0.9rem]">
@@ -214,7 +215,7 @@ export default function AlphabetPage() {
             {/* Tip */}
             {selected.tip && (
               <section className="rounded-xl bg-primary/5 border border-primary/15 px-3.5 py-2.5 space-y-1">
-                <SectionLabel>{uiText.tip[interfaceLang]}</SectionLabel>
+                <SectionLabel>{t.alphabet.tip}</SectionLabel>
                 <p className="text-[0.85rem] leading-relaxed text-foreground/75">
                   {selected.tip[interfaceLang]}
                 </p>
@@ -279,66 +280,4 @@ function LetterButton({
       </span>
     </button>
   )
-}
-
-// ─────────────────────────────────────────────
-// UI strings
-// ─────────────────────────────────────────────
-
-const uiText: Record<string, Record<InterfaceLang, string>> = {
-  subtitle: {
-    ru: 'Нажми на букву, чтобы узнать, как она читается',
-    en: 'Tap a letter to learn how it sounds',
-    es: 'Toca una letra para ver cómo se pronuncia',
-  },
-  noAlphabet: {
-    ru: 'Алфавит для этого языка пока не добавлен',
-    en: 'The alphabet for this language is not available yet',
-    es: 'El alfabeto de este idioma aún no está disponible',
-  },
-  digraphs: {
-    ru: 'Диграфы',
-    en: 'Digraphs',
-    es: 'Dígrafos',
-  },
-  selectHint: {
-    ru: 'Выбери букву чтобы увидеть объяснение',
-    en: 'Select a letter to see the explanation',
-    es: 'Selecciona una letra para ver la explicación',
-  },
-  hasQuirks: {
-    ru: 'с особенностями',
-    en: 'has quirks',
-    es: 'con peculiaridades',
-  },
-  playLetter: {
-    ru: 'Буква',
-    en: 'Letter',
-    es: 'Letra',
-  },
-  playName: {
-    ru: 'Название',
-    en: 'Name',
-    es: 'Nombre',
-  },
-  stop: {
-    ru: 'Стоп',
-    en: 'Stop',
-    es: 'Parar',
-  },
-  how: {
-    ru: 'Как читается',
-    en: 'How it sounds',
-    es: 'Cómo se pronuncia',
-  },
-  examples: {
-    ru: 'Примеры',
-    en: 'Examples',
-    es: 'Ejemplos',
-  },
-  tip: {
-    ru: 'Обрати внимание',
-    en: 'Watch out',
-    es: 'Ojo',
-  },
 }

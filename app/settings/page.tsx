@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, LogOut, Sun, Moon } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
-import { t } from '@/lib/i18n'
-import { LEVELS, LEVEL_DESCRIPTIONS } from '@/core/constants'
+import { useT } from '@/hooks/use-t'
+import { LEVELS } from '@/core/constants'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -26,12 +26,12 @@ import {
   LEARNING_LANGUAGES,
   LEARNING_LANG_CODES,
 } from '@/lib/languages'
-import type { Level } from '@/types/database'
 
 
 export default function SettingsPage() {
   const router = useRouter()
   const { interfaceLang: lang, learningLang, level, updateProfile, updateLevel, setActiveLanguage, isLoading } = useUser()
+  const { t } = useT()
 
   const [isDark, setIsDark] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -60,12 +60,10 @@ export default function SettingsPage() {
   }
 
 
-  const getLevelDescription = (lvl: Level) => LEVEL_DESCRIPTIONS[lvl][lang]
-
   if (isLoading) {
     return (
       <>
-        <SettingsHeader onBack={() => router.back()} title={t('settingsTitle', lang)} />
+        <SettingsHeader onBack={() => router.back()} title={t.settings.title} />
         <div className="mx-auto max-w-lg px-4 py-6 space-y-4">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />
@@ -77,13 +75,13 @@ export default function SettingsPage() {
 
   return (
     <>
-      <SettingsHeader onBack={() => router.back()} title={t('settingsTitle', lang)} />
+      <SettingsHeader onBack={() => router.back()} title={t.settings.title} />
 
       <div className="mx-auto max-w-lg px-4 py-6 space-y-4">
 
         {/* Interface Language */}
         <section className="rounded-2xl bg-card shadow-sm p-4 space-y-3">
-          <p className="text-sm font-medium">{t('interfaceLanguage', lang)}</p>
+          <p className="text-sm font-medium">{t.settings.interfaceLanguage}</p>
           <div className="flex gap-2">
             {INTERFACE_LANG_CODES.map((value) => (
               <OptionChip
@@ -100,7 +98,7 @@ export default function SettingsPage() {
 
         {/* Learning Language */}
         <section className="rounded-2xl bg-card shadow-sm p-4 space-y-3">
-          <p className="text-sm font-medium">{t('learningLanguage', lang)}</p>
+          <p className="text-sm font-medium">{t.settings.learningLanguage}</p>
           <div className="flex gap-2">
             {LEARNING_LANG_CODES.map((value) => (
               <OptionChip
@@ -117,13 +115,13 @@ export default function SettingsPage() {
 
         {/* Level */}
         <section className="rounded-2xl bg-card shadow-sm p-4 space-y-3">
-          <p className="text-sm font-medium">{t('level', lang)}</p>
+          <p className="text-sm font-medium">{t.settings.level}</p>
           <div className="grid grid-cols-3 gap-2">
             {LEVELS.map((lvl) => (
               <LevelChip
                 key={lvl}
                 level={lvl}
-                description={getLevelDescription(lvl)}
+                description={t.levels[lvl]}
                 selected={level === lvl}
                 onClick={() => updateLevel(learningLang, lvl)}
               />
@@ -133,16 +131,16 @@ export default function SettingsPage() {
 
         {/* Theme */}
         <section className="rounded-2xl bg-card shadow-sm p-4 space-y-3">
-          <p className="text-sm font-medium">{t('theme', lang)}</p>
+          <p className="text-sm font-medium">{t.settings.theme}</p>
           {mounted ? (
             <div className="flex gap-2">
               <OptionChip selected={!isDark} onClick={() => applyTheme(false)}>
                 <Sun className="h-4 w-4" />
-                <span>{t('themeLight', lang)}</span>
+                <span>{t.settings.themeLight}</span>
               </OptionChip>
               <OptionChip selected={isDark} onClick={() => applyTheme(true)}>
                 <Moon className="h-4 w-4" />
-                <span>{t('themeDark', lang)}</span>
+                <span>{t.settings.themeDark}</span>
               </OptionChip>
             </div>
           ) : (
@@ -159,29 +157,29 @@ export default function SettingsPage() {
           className="w-full flex items-center justify-center gap-2 rounded-2xl border border-border bg-card shadow-sm px-4 py-3.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border/70 transition-all active:scale-[0.98]"
         >
           <LogOut className="h-4 w-4" />
-          {t('logout', lang)}
+          {t.settings.logout}
         </button>
 
         {/* Reset progress */}
         <section className="rounded-2xl bg-card shadow-sm p-4 space-y-3 border border-destructive/25">
-          <p className="text-sm font-medium text-destructive">{t('resetProgress', lang)}</p>
+          <p className="text-sm font-medium text-destructive">{t.settings.resetProgress}</p>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" className="w-full">
-                {t('reset', lang)}
+                {t.settings.reset}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>{t('resetConfirmTitle', lang)}</AlertDialogTitle>
+                <AlertDialogTitle>{t.settings.resetConfirmTitle}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {t('resetConfirmMessage', lang)}
+                  {t.settings.resetConfirmMessage}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>{t('cancel', lang)}</AlertDialogCancel>
+                <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
                 <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
-                  {t('confirm', lang)}
+                  {t.common.confirm}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

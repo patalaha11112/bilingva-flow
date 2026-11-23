@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { InterfaceLang, LearningLang, Level } from '@/types/database'
 import { getInterfaceLanguage, getLearningLanguage } from '@/lib/languages'
+import { getMessages } from '@/locales'
 import { LIMITS, isAppAdmin, isInterfaceLang, isLearningLang, isLevel, sanitizePromptText } from '@/lib/server/access'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
@@ -125,9 +126,7 @@ Rules:
       aiAlternatives = Array.isArray(parsed.alternatives) ? parsed.alternatives : []
       aiFunFact = String(parsed.fun_fact ?? '')
     } catch {
-      aiFeedback = interface_language === 'ru' ? 'Отличная работа! Продолжай в том же духе.'
-                 : interface_language === 'es' ? '¡Excelente trabajo! Sigue así.'
-                 : 'Great work! Keep it up.'
+      aiFeedback = getMessages(interface_language).server.essayFallbackFeedback
     }
 
     const { week, year } = getISOWeek(new Date())

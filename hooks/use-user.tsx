@@ -274,7 +274,7 @@ function getWeekNumber(date: Date): number {
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
 }
 
-// Возвращает Mon–Sun текущей недели
+// Mon–Sun of the current week
 function getWeekDates(date: Date): Date[] {
   const day = date.getDay()
   const diff = day === 0 ? -6 : 1 - day

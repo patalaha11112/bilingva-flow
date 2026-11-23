@@ -6,23 +6,16 @@ import { Lightbulb } from 'lucide-react'
 import Link from 'next/link'
 import { useUser } from '@/hooks/use-user'
 import { WeekProgress } from '@/components/week-progress'
-import { t } from '@/lib/i18n'
+import { useT } from '@/hooks/use-t'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HomeTopSection } from '@/components/home-top-section'
 import { ActivityArchive } from '@/components/activity-archive'
-import type { InterfaceLang } from '@/types/database'
-
-
-const tipLabel: Record<InterfaceLang, string> = {
-  ru: 'Совет дня',
-  en: 'Tip of the day',
-  es: 'Consejo del día',
-}
 
 export default function Home() {
   const router = useRouter()
   const { user, profile, interfaceLang: lang, learningLang, level, stats, weekActivity, isLoading, error, refetch } = useUser()
+  const { t } = useT()
   const [tip, setTip] = useState<string | null>(null)
 
   useEffect(() => {
@@ -50,7 +43,7 @@ export default function Home() {
   if (!profile) {
     return (
       <div className="mx-auto max-w-lg px-4 py-20 text-center">
-        <p className="text-muted-foreground">Завершите настройку профиля…</p>
+        <p className="text-muted-foreground">{t.home.finishProfileSetup}</p>
       </div>
     )
   }
@@ -59,7 +52,6 @@ export default function Home() {
     <div className="mx-auto max-w-lg space-y-5 px-4 py-6">
 
       <HomeTopSection
-        lang={lang}
         learningLang={learningLang}
         level={level}
         stats={stats}
@@ -69,11 +61,11 @@ export default function Home() {
       <section className="rounded-2xl bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-medium text-muted-foreground">
-            {t('weekProgress', lang)}
+            {t.home.weekActivity}
           </h2>
-          <ActivityArchive lang={lang} userId={profile.id} />
+          <ActivityArchive userId={profile.id} />
         </div>
-        <WeekProgress activity={weekActivity} lang={lang} />
+        <WeekProgress activity={weekActivity} />
       </section>
 
       {/* Tip of the day */}
@@ -81,7 +73,7 @@ export default function Home() {
         <section className="rounded-2xl bg-card p-4 shadow-sm space-y-2">
           <div className="flex items-center gap-2">
             <Lightbulb className="h-4 w-4 text-yellow-500" />
-            <h2 className="text-sm font-medium text-muted-foreground">{tipLabel[lang]}</h2>
+            <h2 className="text-sm font-medium text-muted-foreground">{t.home.tipOfDay}</h2>
           </div>
           <p className="text-sm leading-relaxed text-foreground/80">{tip}</p>
         </section>
@@ -89,7 +81,7 @@ export default function Home() {
 
       {/* Start button */}
       <Button asChild className="w-full h-12 text-base font-medium">
-        <Link href="/sentences">{t('startExercise', lang)}</Link>
+        <Link href="/sentences">{t.home.startExercise}</Link>
       </Button>
 
     </div>

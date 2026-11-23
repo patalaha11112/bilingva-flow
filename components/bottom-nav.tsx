@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Home, BookA, MessageSquareText, Mic2, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/hooks/use-user'
-import { t } from '@/lib/i18n'
+import { useT } from '@/hooks/use-t'
 import { getLearningLanguage } from '@/lib/languages'
 
 const navItems = [
@@ -18,7 +18,8 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname()
-  const { interfaceLang: lang, learningLang } = useUser()
+  const { learningLang } = useUser()
+  const { t } = useT()
   const items = navItems.filter(({ href }) => href !== '/alphabet' || getLearningLanguage(learningLang).hasAlphabet)
 
   const hidden = ['/login', '/register'].includes(pathname)
@@ -41,7 +42,7 @@ export function BottomNav() {
               )}
             >
               <Icon className={cn('h-5 w-5', isActive && 'stroke-[2.5]')} />
-              <span className="font-medium">{t(key, lang)}</span>
+              <span className="font-medium">{t.nav[key]}</span>
             </Link>
           )
         })}

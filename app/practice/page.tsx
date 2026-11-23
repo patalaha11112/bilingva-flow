@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Loader2, Star } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
-import { t } from '@/lib/i18n'
+import { useT } from '@/hooks/use-t'
+import { plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import type { InterfaceLang } from '@/types/database'
 
 type Phase = 'loading' | 'writing' | 'analyzing' | 'feedback' | 'done_today'
 
@@ -36,6 +36,7 @@ interface FeedbackData {
 
 export default function PracticePage() {
   const { interfaceLang: lang, learningLang, level, isLoading: userLoading } = useUser()
+  const { t, locale } = useT()
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [topic, setTopic] = useState('')
@@ -93,8 +94,9 @@ export default function PracticePage() {
       })
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { error?: string }
-        throw new Error(err.error ?? 'Server error')
+        const err = await res.json().catch(() => ({})) as { code?: string }
+        const errors = t.practice.errors as Record<string, string>
+        throw new Error((err.code && errors[err.code]) || t.practice.errors.generic)
       }
       const data = await res.json() as {
         score: number; feedback: string; word_count: number
@@ -110,7 +112,7 @@ export default function PracticePage() {
       })
       setPhase('feedback')
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Error')
+      setSubmitError(err instanceof Error ? err.message : t.practice.errors.generic)
       setPhase('writing')
     }
   }
@@ -146,12 +148,12 @@ export default function PracticePage() {
   if (phase === 'done_today') {
     return (
       <div className="mx-auto max-w-lg px-4 py-6 space-y-4">
-        <CompletionCard lang={lang} topic={topic} />
+        <CompletionCard title={t.practice.doneToday} topic={topic} />
         <button
           onClick={handleWriteAnother}
           className="w-full rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3.5 text-sm font-semibold text-primary transition-all hover:bg-primary/15 active:scale-[0.98]"
         >
-          {t('essayWriteAnother', lang)}
+          {t.practice.writeAnother}
         </button>
       </div>
     )
@@ -162,21 +164,14 @@ export default function PracticePage() {
       <div className="mx-auto max-w-lg px-4 py-6">
         <div className="rounded-2xl bg-card shadow-sm p-8 flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm font-medium text-muted-foreground">{t('essayAnalyzing', lang)}</p>
+          <p className="text-sm font-medium text-muted-foreground">{t.practice.analyzing}</p>
         </div>
       </div>
     )
   }
 
   if (phase === 'feedback' && feedbackData) {
-    const ui = {
-      improvements: lang === 'ru' ? 'Как улучшить' : lang === 'es' ? 'Cómo mejorar' : 'How to improve',
-      original: lang === 'ru' ? 'Было' : lang === 'es' ? 'Original' : 'Original',
-      better: lang === 'ru' ? 'Лучше' : lang === 'es' ? 'Mejor' : 'Better',
-      alternatives: lang === 'ru' ? 'Другие способы выразить' : lang === 'es' ? 'Otras formas de decirlo' : 'Alternative expressions',
-      instead: lang === 'ru' ? 'вместо' : lang === 'es' ? 'en vez de' : 'instead of',
-      funFact: lang === 'ru' ? 'Интересный факт' : lang === 'es' ? 'Dato curioso' : 'Fun fact',
-    }
+    const ui = t.practice
 
     return (
       <div className="mx-auto max-w-lg px-4 py-6 space-y-4">
@@ -184,18 +179,18 @@ export default function PracticePage() {
         {/* Score card */}
         <section className="rounded-2xl bg-card shadow-sm p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-base font-semibold">{t('essayGreatWork', lang)}</p>
+            <p className="text-base font-semibold">{t.practice.greatWork}</p>
             <span className="text-xs text-muted-foreground">
-              {feedbackData.word_count} {t('essayWordCountSuffix', lang)}
+              {plural(locale, feedbackData.word_count, t.practice.words)}
             </span>
           </div>
-          <ScoreDisplay score={feedbackData.score} label={t('essayScoreLabel', lang)} />
+          <ScoreDisplay score={feedbackData.score} label={t.practice.score} />
         </section>
 
         {/* AI feedback */}
         <section className="rounded-2xl bg-card shadow-sm p-5 space-y-2">
           <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground/50">
-            {t('essayFeedbackLabel', lang)}
+            {t.practice.feedback}
           </p>
           <p className="text-sm leading-relaxed text-foreground/80">{feedbackData.feedback}</p>
         </section>
@@ -269,7 +264,7 @@ export default function PracticePage() {
           onClick={handleWriteAnother}
           className="w-full rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3.5 text-sm font-semibold text-primary transition-all hover:bg-primary/15 active:scale-[0.98]"
         >
-          {t('essayWriteAnother', lang)}
+          {t.practice.writeAnother}
         </button>
 
       </div>
@@ -284,11 +279,11 @@ export default function PracticePage() {
       <section className="rounded-2xl bg-card shadow-sm p-4 space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground/50">
-            {t('essayTopic', lang)}
+            {t.practice.topic}
           </p>
           {isBonus && (
             <span className="rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[0.58rem] font-semibold uppercase tracking-widest text-primary">
-              {t('essayBonusLabel', lang)}
+              {t.practice.bonus}
             </span>
           )}
         </div>
@@ -299,7 +294,7 @@ export default function PracticePage() {
       {suggestedWords.length > 0 && (
         <section className="rounded-2xl bg-card shadow-sm p-4 space-y-2.5">
           <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground/50">
-            {t('essaySuggestedWords', lang)}
+            {t.practice.suggestedWords}
           </p>
           <div className="flex flex-wrap gap-2">
             {suggestedWords.map(word => (
@@ -315,15 +310,15 @@ export default function PracticePage() {
           ref={textareaRef}
           value={content}
           onChange={e => setContent(e.target.value)}
-          placeholder={t('essayPlaceholder', lang)}
+          placeholder={t.practice.placeholder}
           rows={8}
           className="w-full resize-none rounded-xl border border-border bg-background px-3.5 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40 transition-shadow"
         />
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground/60">
             {wordCount > 0
-              ? `${wordCount} ${t('essayWordCountSuffix', lang)}`
-              : t('essayMinHint', lang)}
+              ? plural(locale, wordCount, t.practice.words)
+              : t.practice.minHint}
           </span>
           <button
             onClick={handleSubmit}
@@ -335,7 +330,7 @@ export default function PracticePage() {
                 : 'bg-muted text-muted-foreground cursor-not-allowed'
             )}
           >
-            {t('essaySubmit', lang)}
+            {t.practice.submit}
           </button>
         </div>
         {submitError && (
@@ -351,15 +346,10 @@ export default function PracticePage() {
 // Sub-components
 // ─────────────────────────────────────────────
 
-function CompletionCard({ lang, topic }: { lang: InterfaceLang; topic: string }) {
-  const messages: Record<InterfaceLang, string> = {
-    ru: 'Ты уже написал эссе сегодня 🎉',
-    en: 'You already wrote an essay today 🎉',
-    es: 'Ya escribiste un ensayo hoy 🎉',
-  }
+function CompletionCard({ title, topic }: { title: string; topic: string }) {
   return (
     <section className="rounded-2xl bg-card shadow-sm p-5 space-y-2 text-center">
-      <p className="text-base font-semibold">{messages[lang]}</p>
+      <p className="text-base font-semibold">{title}</p>
       <p className="text-sm text-muted-foreground">{topic}</p>
     </section>
   )

@@ -2,34 +2,33 @@
 
 import { cn } from '@/lib/utils'
 import type { WeekActivity } from '@/types/database'
-import type { InterfaceLang } from '@/types/database'
-import { t } from '@/lib/i18n'
+import { useT } from '@/hooks/use-t'
+import { weekdaysShort } from '@/lib/format'
 
 interface WeekProgressProps {
   activity: WeekActivity[]
-  lang: InterfaceLang
 }
 
-const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
-
-export function WeekProgress({ activity, lang }: WeekProgressProps) {
+export function WeekProgress({ activity }: WeekProgressProps) {
+  const { t, locale } = useT()
+  const dayLabels = weekdaysShort(locale)
   return (
     <div className="space-y-3">
       {/* Legend */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-muted-foreground">{t('thisWeek', lang)}</h3>
+        <h3 className="text-sm font-medium text-muted-foreground">{t.home.thisWeek}</h3>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <div className="h-2 w-2 rounded-full bg-[var(--ring-blue)]" />
-            <span>{t('legend_sentences', lang)}</span>
+            <span>{t.home.legend.sentences}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="h-2 w-2 rounded-full bg-[var(--ring-green)]" />
-            <span>{t('legend_dialog', lang)}</span>
+            <span>{t.home.legend.dialog}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="h-2 w-2 rounded-full bg-[var(--ring-orange)]" />
-            <span>{t('legend_video', lang)}</span>
+            <span>{t.home.legend.video}</span>
           </div>
         </div>
       </div>
@@ -37,7 +36,7 @@ export function WeekProgress({ activity, lang }: WeekProgressProps) {
       {/* Rings */}
       <div className="flex items-center justify-between gap-1">
         {activity.map((day, index) => {
-          const dayLabel = t(DAY_KEYS[index], lang)
+          const dayLabel = dayLabels[index]
           return (
             <div
               key={day.date}
@@ -72,9 +71,9 @@ function DayRing({ day }: { day: WeekActivity }) {
 
   const circ = (r: number) => 2 * Math.PI * r
 
-  // Для fully_complete — все три кольца заполнены
-  // Для partially — заполнено первое (sentences_done > 0 OR dialog_done)
-  // Для пустых — ничего
+  // fully_complete: all three rings filled
+  // partially_complete: only the outer ring (any exercise done)
+  // empty day: nothing
   const sentenceFill = day.fully_complete || day.partially_complete
   const dialogFill = day.fully_complete
   const videoFill = day.fully_complete
