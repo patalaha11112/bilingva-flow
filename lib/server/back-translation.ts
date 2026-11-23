@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { InterfaceLang, LearningLang, Level } from '@/types/database'
+import type { InterfaceLang, LearningLang } from '@/types/database'
+import { DAILY_GOALS } from '@/lib/daily-goals'
 import type { BackTSentence } from '@/types/back-translation'
 import { localDate, markActivity } from '@/lib/server/activity'
 
@@ -7,12 +8,6 @@ import { localDate, markActivity } from '@/lib/server/activity'
 // Back-T rules shared by the API routes.
 // ============================================
 
-/** New sentences per day: one for beginners, two from B1 */
-export function dailyTarget(level: Level): number {
-  return level === 'A1' || level === 'A2' ? 1 : 2
-}
-
-export const BACK_T_MAX_PER_DAY = 5
 
 /** Sentences (with their gloss) by id, in the order of `ids` */
 export async function loadSentences(supabase: SupabaseClient, ids: string[]): Promise<Map<string, BackTSentence>> {
@@ -59,27 +54,31 @@ export async function candidateSentenceIds(
 
 /**
  * The Back-T ring is done for today when nothing is waiting for step 2 and
- * today's new sentences (the level's target) are translated.
+ * today's new sentences are translated: the daily goal, or fewer when the
+ * user has no more unused sentences.
  */
 export async function updateBackTRing(
   supabase: SupabaseClient,
   userId: string,
   language: LearningLang,
-  level: Level,
+  interfaceLanguage: InterfaceLang,
   tz: string
 ) {
   const today = localDate(tz)
   const { data } = await supabase
     .from('back_translations')
-    .select('forward_date, back_text')
+    .select('sentence_id, forward_date, back_text')
     .eq('user_id', userId)
     .eq('language', language)
-    .gte('forward_date', new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10))
 
   const rows = data ?? []
   const due = rows.filter((r) => !r.back_text && r.forward_date < today).length
   const forwardedToday = rows.filter((r) => r.forward_date === today).length
-  if (due === 0 && forwardedToday >= dailyTarget(level)) {
+  const used = new Set(rows.map((r) => r.sentence_id))
+  const available = (await candidateSentenceIds(supabase, userId, language, interfaceLanguage)).filter((id) => !used.has(id)).length
+  const goal = Math.min(DAILY_GOALS.backTranslations, forwardedToday + available)
+
+  if (due === 0 && forwardedToday >= goal && (forwardedToday > 0 || rows.some((r) => r.back_text))) {
     await markActivity(userId, language, tz, { backTranslationDone: true })
   }
 }

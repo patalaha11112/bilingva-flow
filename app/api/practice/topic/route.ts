@@ -1,25 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { localized } from '@/lib/languages'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getMessages } from '@/locales'
-import { getWeekStart } from '@/lib/server/access'
 import { localDate } from '@/lib/server/activity'
 import { TopicQuery, parseQuery } from '@/lib/server/validation'
+import { getCurrentSet, loadSetSentences } from '@/lib/server/sentences'
+import { AI_MODELS, generateJson } from '@/lib/server/ai'
+import { ESSAY_TOPIC_SCHEMA, essayTopicPrompt } from '@/lib/server/prompts'
 
-function getISOWeek(date: Date): { week: number; year: number } {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
-  return { week, year: d.getUTCFullYear() }
-}
+export const maxDuration = 60
 
+type Word = { text: string; translation: string }
 
+/** Essay assignment for the current sentence set: a topic and words from its sentences */
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
-
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -27,58 +23,46 @@ export async function GET(request: NextRequest) {
     if (parsed.error) return parsed.error
     const { language, interface_lang: uiLang, tz } = parsed.data
 
-    const today = localDate(tz)
-    const { week, year } = getISOWeek(new Date())
-
-    // Check if essay done today (non-bonus)
     const { data: todayActivity } = await supabase
       .from('user_daily_activity')
       .select('essay_done')
       .eq('user_id', user.id)
       .eq('language', language)
-      .eq('date', today)
+      .eq('date', localDate(tz))
       .maybeSingle()
 
-    const essayDoneToday = todayActivity?.essay_done ?? false
-
-    // Find most practiced topic from this week's sentences
     let topic = ''
+    let words: Word[] = []
 
-    const { data: userSentences } = await supabase
-      .from('user_sentences')
-      .select('sentence_id')
-      .eq('user_id', user.id)
-      .eq('language', language)
-      .gte('first_seen_at', getWeekStart())
-      .limit(50)
-
-    if (userSentences && userSentences.length > 0) {
-      const sentenceIds = userSentences.map(us => us.sentence_id)
-
-      const { data: sentences } = await supabase
-        .from('sentences')
-        .select('topic_id')
-        .in('id', sentenceIds)
-        .not('topic_id', 'is', null)
-
-      if (sentences && sentences.length > 0) {
-        const topicCount: Record<string, number> = {}
-        sentences.forEach(s => {
-          if (s.topic_id) topicCount[s.topic_id] = (topicCount[s.topic_id] ?? 0) + 1
-        })
-
-        const topTopicId = Object.entries(topicCount).sort((a, b) => b[1] - a[1])[0]?.[0]
-
-        if (topTopicId) {
-          const { data: topicData } = await supabase
-            .from('topics')
-            .select('name')
-            .eq('id', topTopicId)
-            .single()
-
-          if (topicData) {
-            topic = localized(topicData.name, uiLang)
+    const set = await getCurrentSet(supabase, user.id, language, uiLang)
+    if (set?.essay_topic) {
+      topic = set.essay_topic
+      words = set.essay_words ?? []
+    } else if (set) {
+      // First essay of this set: build the assignment once and keep it on the set
+      const sentences = await loadSetSentences(supabase, user.id, set.id)
+      if (sentences.length > 0) {
+        try {
+          const result = await generateJson<{ topic: string; words: Word[] }>(
+            AI_MODELS.essayTopic,
+            essayTopicPrompt({
+              language,
+              interfaceLanguage: uiLang,
+              level: set.level,
+              sentences: sentences.map((s: any) => ({ text: s.sentence_text, translation: s.translation })),
+            }),
+            ESSAY_TOPIC_SCHEMA
+          )
+          topic = result.topic.trim()
+          words = (result.words ?? []).filter((w) => w.text && w.translation).slice(0, 8)
+          if (topic) {
+            await createAdminClient()
+              .from('sentence_sets')
+              .update({ essay_topic: topic, essay_words: words })
+              .eq('id', set.id)
           }
+        } catch (err) {
+          console.error('[topic] AI error:', err)
         }
       }
     }
@@ -88,53 +72,10 @@ export async function GET(request: NextRequest) {
       topic = options[new Date().getDay() % options.length]
     }
 
-    // Suggested words: parts the user hasn't marked as understood (all recent sentences)
-    let suggestedWords: { text: string; translation: string }[] = []
-
-    const { data: weekUserSentences } = await supabase
-      .from('user_sentences')
-      .select('sentence_id, understood_parts')
-      .eq('user_id', user.id)
-      .eq('language', language)
-      .order('first_seen_at', { ascending: false })
-      .limit(30)
-
-    if (weekUserSentences && weekUserSentences.length > 0) {
-      const understoodMap: Record<string, string[]> = {}
-      for (const us of weekUserSentences) {
-        understoodMap[us.sentence_id] = (us.understood_parts as string[]) ?? []
-      }
-
-      const sentenceIds = weekUserSentences.map(us => us.sentence_id)
-      const { data: allParts, error: partsError } = await supabase
-        .from('sentence_parts')
-        .select('id, sentence_id, text, translation, sentences!inner(interface_language)')
-        .in('sentence_id', sentenceIds)
-        .eq('sentences.interface_language', uiLang)
-        .order('order_index')
-
-      if (partsError) console.error('[topic] sentence_parts error:', partsError.message)
-
-      if (allParts) {
-        const seen = new Set<string>()
-        for (const p of allParts) {
-          if (suggestedWords.length >= 8) break
-          const understood = understoodMap[p.sentence_id] ?? []
-          if (understood.includes(p.id)) continue
-          const lc = p.text.toLowerCase()
-          if (seen.has(lc)) continue
-          seen.add(lc)
-          suggestedWords.push({ text: p.text, translation: p.translation })
-        }
-      }
-    }
-
     return NextResponse.json({
       topic,
-      suggested_words: suggestedWords,
-      essay_done_today: essayDoneToday,
-      week_number: week,
-      year,
+      suggested_words: words,
+      essay_done_today: todayActivity?.essay_done ?? false,
     })
   } catch (err) {
     console.error('Topic route error:', err)

@@ -35,7 +35,6 @@ export default function BackTPage() {
     const params = new URLSearchParams({
       language: learningLang,
       interface_lang: interfaceLang,
-      level,
       tz: getTimeZone(),
     })
     if (count) params.set('count', String(count))
@@ -46,7 +45,7 @@ export default function BackTPage() {
     } catch {
       setLoadError(true)
     }
-  }, [learningLang, interfaceLang, level, count])
+  }, [learningLang, interfaceLang, count])
 
   useEffect(() => {
     if (!userLoading && user) load()
@@ -215,7 +214,7 @@ function TodayCard({
   onSaved: (saved: { id: string; forward_text: string }) => void
 }) {
   const { t } = useT()
-  const { learningLang, interfaceLang, level } = useUser()
+  const { learningLang, interfaceLang } = useUser()
   const [showGloss, setShowGloss] = useState(true)
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
@@ -235,7 +234,6 @@ function TodayCard({
           text,
           language: learningLang,
           interface_language: interfaceLang,
-          level,
           tz: getTimeZone(),
         }),
       })

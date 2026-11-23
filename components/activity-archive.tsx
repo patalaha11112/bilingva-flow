@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { useT } from '@/hooks/use-t'
 import { useUser } from '@/hooks/use-user'
+import { DAILY_GOALS } from '@/lib/daily-goals'
 import { dayHeading, monthYear, parseLocalDate, toDateString, weekdaysShort } from '@/lib/format'
 
 interface DayActivity {
@@ -182,8 +183,8 @@ export function ActivityArchive({ userId }: ActivityArchiveProps) {
             <DayDetailRow
               icon={<BookOpen className="h-4 w-4 text-[var(--ring-blue)]" />}
               label={t.activity.sentences}
-              done={selectedDay.sentences_done > 0}
-              detail={selectedDay.sentences_done > 0 ? `${selectedDay.sentences_done}` : undefined}
+              done={selectedDay.sentences_done >= DAILY_GOALS.sentencesViewed}
+              detail={selectedDay.sentences_done > 0 ? `${selectedDay.sentences_done}/${DAILY_GOALS.sentencesViewed}` : undefined}
             />
             <DayDetailRow
               icon={<Repeat2 className="h-4 w-4 text-[var(--ring-green)]" />}
@@ -213,7 +214,7 @@ function MiniRing({ day }: { day: DayActivity }) {
   const r3 = r2 - stroke - 1.5
   const c = (r: number) => 2 * Math.PI * r
 
-  const ring1 = day.sentences_done > 0
+  const ring1 = day.sentences_done >= DAILY_GOALS.sentencesViewed
   const ring2 = day.back_translation_done
   const ring3 = day.essay_done
 

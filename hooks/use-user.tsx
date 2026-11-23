@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { parseLocalDate, toDateString } from '@/lib/format'
+import { DAILY_GOALS } from '@/lib/daily-goals'
 import {
   DEFAULT_INTERFACE_LANG,
   DEFAULT_LEARNING_LANG,
@@ -31,6 +32,8 @@ interface UserContextValue {
   level: Level
   stats: UserStats
   weekActivity: WeekActivity[]
+  /** Today's progress on the daily path */
+  today: TodayProgress
   isLoading: boolean
   error: string | null
   updateProfile: (updates: Partial<Pick<UserProfile, 'interface_language' | 'app_color'>>) => Promise<void>
@@ -45,6 +48,14 @@ const EMPTY_STATS: UserStats = {
   back_translations_completed: 0,
   essays_completed: 0,
 }
+
+export interface TodayProgress {
+  sentencesViewed: number
+  backTranslation: boolean
+  essay: boolean
+}
+
+const EMPTY_TODAY: TodayProgress = { sentencesViewed: 0, backTranslation: false, essay: false }
 
 const UserContext = createContext<UserContextValue | null>(null)
 
@@ -62,6 +73,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [activeLanguage, setActiveLanguageState] = useState<UserLanguageSettings | null>(null)
   const [stats, setStats] = useState<UserStats>(EMPTY_STATS)
   const [weekActivity, setWeekActivity] = useState<WeekActivity[]>([])
+  const [today, setToday] = useState<TodayProgress>(EMPTY_TODAY)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [browserLang, setBrowserLang] = useState<InterfaceLang | null>(null)
@@ -86,6 +98,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         setActiveLanguageState(null)
         setStats(EMPTY_STATS)
         setWeekActivity([])
+        setToday(EMPTY_TODAY)
         return
       }
 
@@ -146,12 +159,19 @@ export function UserProvider({ children }: { children: ReactNode }) {
         const day = activityData?.find(a => a.date === date)
         return {
           date,
-          sentences: (day?.sentences_done ?? 0) > 0,
+          sentences: (day?.sentences_done ?? 0) >= DAILY_GOALS.sentencesViewed,
           back_translation: day?.back_translation_done ?? false,
           essay: day?.essay_done ?? false,
           is_today: date === todayStr,
         }
       }))
+
+      const todayRow = activityData?.find(a => a.date === todayStr)
+      setToday({
+        sentencesViewed: todayRow?.sentences_done ?? 0,
+        backTranslation: todayRow?.back_translation_done ?? false,
+        essay: todayRow?.essay_done ?? false,
+      })
 
       setStats({
         sentences_completed: (activityData ?? []).reduce((sum, d) => sum + (d.sentences_done ?? 0), 0),
@@ -236,6 +256,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     level,
     stats,
     weekActivity,
+    today,
     isLoading,
     error,
     updateProfile,

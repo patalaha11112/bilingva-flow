@@ -8,128 +8,118 @@ import type {
   InterfaceLang,
 } from '@/types/database'
 
+/** The current sentence set as returned by /api/sentences */
+interface SetInfo {
+  id: string
+  size: number
+  max: number
+  /** All sentences understood today: the next set opens tomorrow */
+  completedToday: boolean
+}
+
 interface UseSentencesReturn {
-  // Data
   sentences: SentenceWithParts[]
-  currentSentence: SentenceWithParts | null
-  currentIndex: number
   userProgress: Record<string, UserSentence>
-  weeklyCount: number
-  weeklyLimit: number
-  /** The server refused more sentences this week */
+  set: SetInfo | null
+  /** The server refused more sentences today */
   limitReached: boolean
 
-  // State
   isLoading: boolean
   isGenerating: boolean
   error: string | null
 
-  // Actions
   markPartUnderstood: (sentenceId: string, partId: string) => Promise<void>
   markAllUnderstood: (sentenceId: string) => Promise<void>
-  nextSentence: () => void
+  /** The breakdown of a sentence was opened in training (counts for today's goal) */
+  markViewed: (sentenceId: string) => void
   addMoreSentences: () => Promise<void>
-  refreshSentences: () => Promise<void>
+  skipSet: () => Promise<void>
   refetch: () => Promise<void>
 }
 
 interface UseSentencesParams {
   language: LearningLang
   level: Level
-  topicId?: string
-  customTopic?: string
   interfaceLanguage: InterfaceLang
   enabled?: boolean
+}
+
+type SetResponse = {
+  sentences: SentenceWithParts[]
+  userProgress?: Record<string, UserSentence>
+  set: SetInfo
 }
 
 export function useSentences({
   language,
   level,
-  topicId,
-  customTopic,
   interfaceLanguage,
   enabled = true,
 }: UseSentencesParams): UseSentencesReturn {
   const [sentences, setSentences] = useState<SentenceWithParts[]>([])
-  const [currentIndex, setCurrentIndex] = useState(0)
   const [userProgress, setUserProgress] = useState<Record<string, UserSentence>>({})
+  const [set, setSet] = useState<SetInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [weeklyCount, setWeeklyCount] = useState(0)
-  const [weeklyLimit, setWeeklyLimit] = useState(10)
   const [limitReached, setLimitReached] = useState(false)
+
+  /** Loads the set; `action` adds sentences or skips the set. Returns false on the daily limit. */
+  const request = useCallback(async (action: { add_count?: number; skip?: boolean } = {}) => {
+    const res = await fetch('/api/sentences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ language, level, interface_language: interfaceLanguage, tz: getTimeZone(), ...action }),
+    })
+    if (res.status === 429) {
+      setLimitReached(true)
+      return false
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({})) as { error?: string }
+      throw new Error(data.error || 'Failed to load sentences')
+    }
+    const data = await res.json() as SetResponse
+    setSentences(data.sentences.map(s => ({
+      ...s,
+      sentence_parts: [...(s.sentence_parts ?? [])].sort((a, b) => a.order_index - b.order_index),
+    })))
+    setUserProgress(data.userProgress ?? {})
+    setSet(data.set)
+    return true
+  }, [language, level, interfaceLanguage])
 
   const fetchSentences = useCallback(async () => {
     if (!enabled) return
-
+    setIsLoading(true)
+    setIsGenerating(true)
+    setError(null)
     try {
-      setIsLoading(true)
-      setError(null)
-
-      setIsGenerating(true)
-      const res = await fetch('/api/sentences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          language,
-          level,
-          topic_id: topicId,
-          custom_topic: customTopic,
-          interface_language: interfaceLanguage,
-        }),
-      })
-
-      setIsGenerating(false)
-
-      if (!res.ok) {
-        let errorMsg = 'Failed to fetch sentences'
-        try {
-          const errData = await res.json() as { error?: string }
-          if (errData && errData.error) {
-            errorMsg = errData.error
-          }
-        } catch {}
-        throw new Error(errorMsg)
-      }
-
-      const data = await res.json() as {
-        sentences: SentenceWithParts[]
-        weeklyLimit?: { total: number; max: number }
-        userProgress?: Record<string, UserSentence>
-      }
-
-      // Sort parts by order_index
-      const sorted = data.sentences.map(s => ({
-        ...s,
-        sentence_parts: [...(s.sentence_parts ?? [])].sort(
-          (a, b) => a.order_index - b.order_index
-        ),
-      }))
-
-      setSentences(sorted)
-      setCurrentIndex(0)
-
-      if (data.weeklyLimit) {
-        setWeeklyCount(data.weeklyLimit.total)
-        setWeeklyLimit(data.weeklyLimit.max)
-      }
-
-      if (data.userProgress) {
-        setUserProgress(data.userProgress)
-      }
-
+      await request()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
-      setIsGenerating(false)
     } finally {
+      setIsGenerating(false)
       setIsLoading(false)
     }
-  }, [language, level, topicId, customTopic, interfaceLanguage, enabled])
+  }, [enabled, request])
 
   useEffect(() => {
     fetchSentences()
   }, [fetchSentences])
+
+  const runAction = async (action: { add_count?: number; skip?: boolean }) => {
+    if (!enabled) return
+    setIsGenerating(true)
+    setError(null)
+    try {
+      await request(action)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   // Latest progress for computing toggles, and a queue so saves reach the server in click order
   const progressRef = useRef(userProgress)
@@ -183,168 +173,30 @@ export function useSentences({
     return setUnderstoodParts(sentenceId, isAll ? [] : allPartIds, !isAll)
   }
 
-  // Next sentence in training mode
-  const nextSentence = () => {
-    if (currentIndex < sentences.length - 1) {
-      setCurrentIndex(prev => prev + 1)
-    }
+  const markViewed = (sentenceId: string) => {
+    fetch('/api/progress/view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sentence_id: sentenceId, language, tz: getTimeZone() }),
+    }).catch(err => console.error('mark viewed:', err))
   }
 
-  // Add more sentences to the current week (up to limit)
-  const addMoreSentences = async () => {
-    if (!enabled || weeklyCount >= weeklyLimit) return
-
-    try {
-      setIsGenerating(true)
-      setError(null)
-
-      const res = await fetch('/api/sentences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          language,
-          level,
-          topic_id: topicId,
-          custom_topic: customTopic,
-          interface_language: interfaceLanguage,
-          add_count: 1,
-        }),
-      })
-
-      if (res.status === 429) {
-        setLimitReached(true)
-        return
-      }
-
-      if (!res.ok) {
-        let errorMsg = 'Failed to fetch more sentences'
-        try {
-          const errData = await res.json() as { error?: string }
-          if (errData && errData.error) {
-            errorMsg = errData.error
-          }
-        } catch {}
-        throw new Error(errorMsg)
-      }
-
-      const data = await res.json() as {
-        sentences: SentenceWithParts[]
-        weeklyLimit?: { total: number; max: number }
-        userProgress?: Record<string, UserSentence>
-      }
-
-      const sorted = data.sentences.map(s => ({
-        ...s,
-        sentence_parts: [...(s.sentence_parts ?? [])].sort(
-          (a, b) => a.order_index - b.order_index
-        ),
-      }))
-
-      // Add new sentences to existing
-      setSentences(prev => [...prev, ...sorted])
-
-      if (data.weeklyLimit) {
-        setWeeklyCount(data.weeklyLimit.total)
-        setWeeklyLimit(data.weeklyLimit.max)
-      }
-
-      if (data.userProgress) {
-        setUserProgress(prev => ({ ...prev, ...data.userProgress }))
-      }
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  // Refresh: deactivate current, get 5 new ones
-  const refreshSentences = async () => {
-    if (!enabled) return
-
-    try {
-      setIsGenerating(true)
-      setError(null)
-
-      const res = await fetch('/api/sentences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          language,
-          level,
-          topic_id: topicId,
-          custom_topic: customTopic,
-          interface_language: interfaceLanguage,
-          refresh: true,
-        }),
-      })
-
-      if (res.status === 429) {
-        setLimitReached(true)
-        return
-      }
-
-      if (!res.ok) {
-        let errorMsg = 'Failed to refresh sentences'
-        try {
-          const errData = await res.json() as { error?: string }
-          if (errData && errData.error) {
-            errorMsg = errData.error
-          }
-        } catch {}
-        throw new Error(errorMsg)
-      }
-
-      const data = await res.json() as {
-        sentences: SentenceWithParts[]
-        weeklyLimit?: { total: number; max: number }
-        userProgress?: Record<string, UserSentence>
-      }
-
-      const sorted = data.sentences.map(s => ({
-        ...s,
-        sentence_parts: [...(s.sentence_parts ?? [])].sort(
-          (a, b) => a.order_index - b.order_index
-        ),
-      }))
-
-      // Replace with new sentences
-      setSentences(sorted)
-      setCurrentIndex(0)
-
-      if (data.weeklyLimit) {
-        setWeeklyCount(data.weeklyLimit.total)
-        setWeeklyLimit(data.weeklyLimit.max)
-      }
-
-      if (data.userProgress) {
-        setUserProgress(data.userProgress)
-      }
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
+  // Follows the progress saved after the set was loaded (the server applies the same rule)
+  const completedToday = sentences.length > 0 && sentences.every(s => userProgress[s.id]?.all_understood)
 
   return {
     sentences,
-    currentSentence: sentences[currentIndex] ?? null,
-    currentIndex,
     userProgress,
-    weeklyCount,
-    weeklyLimit,
+    set: set && { ...set, completedToday },
     limitReached,
     isLoading,
     isGenerating,
     error,
     markPartUnderstood,
     markAllUnderstood,
-    nextSentence,
-    addMoreSentences,
-    refreshSentences,
+    markViewed,
+    addMoreSentences: () => runAction({ add_count: 1 }),
+    skipSet: () => runAction({ skip: true }),
     refetch: fetchSentences,
   }
 }

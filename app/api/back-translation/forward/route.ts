@@ -4,7 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { parseBody, BackTForwardBody } from '@/lib/server/validation'
 import { localDate } from '@/lib/server/activity'
 import { isAppAdmin } from '@/lib/server/access'
-import { BACK_T_MAX_PER_DAY, updateBackTRing } from '@/lib/server/back-translation'
+import { updateBackTRing } from '@/lib/server/back-translation'
+import { BACK_T_MAX_PER_DAY } from '@/lib/daily-goals'
 
 /** Step 1: save the user's translation of a sentence into their interface language */
 export async function POST(request: NextRequest) {
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     const parsed = await parseBody(request, BackTForwardBody)
     if (parsed.error) return parsed.error
-    const { sentence_id, text, language, interface_language, level, tz } = parsed.data
+    const { sentence_id, text, language, interface_language, tz } = parsed.data
     const today = localDate(tz)
 
     // Only sentences the user has met, written for this interface language
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status })
     }
 
-    await updateBackTRing(supabase, user.id, language, level, tz)
+    await updateBackTRing(supabase, user.id, language, interface_language, tz)
     return NextResponse.json(row)
   } catch (err) {
     console.error('[back-t] forward error:', err)

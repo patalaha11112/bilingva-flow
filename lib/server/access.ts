@@ -7,10 +7,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 // ============================================
 
 export const LIMITS = {
-  /** Sentences linked per learning language per week (initial set + add + refresh) */
-  sentencesPerWeek: 30,
-  /** Active sentences shown at once */
-  activeSentences: 10,
+  /** New sentences per learning language in 24 hours (new sets + "add one" + skips) */
+  sentencesPerDay: 20,
   /** Essays graded per day */
   essaysPerDay: 20,
   /** Max essay length sent to the AI */
@@ -35,11 +33,4 @@ export async function isAppAdmin(userId: string): Promise<boolean> {
 /** Strips characters that could break out of a quoted prompt value */
 export function sanitizePromptText(text: string, maxChars: number): string {
   return text.replace(/["`\\\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, maxChars)
-}
-
-/** Monday 00:00 UTC of the current week */
-export function getWeekStart(date: Date = new Date()): string {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() || 7) - 1))
-  return d.toISOString()
 }

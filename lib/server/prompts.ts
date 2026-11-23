@@ -254,3 +254,44 @@ export const BACK_TRANSLATION_SCHEMA = {
   },
   required: ['score', 'verdict', 'praise', 'corrections', 'tips'],
 }
+
+export function essayTopicPrompt({
+  language,
+  interfaceLanguage,
+  level,
+  sentences,
+}: {
+  language: LearningLang
+  interfaceLanguage: InterfaceLang
+  level: Level
+  /** The set's sentences with their translations */
+  sentences: { text: string; translation: string }[]
+}): string {
+  const langName = getLearningLanguage(language).prompt.name
+  const uiLang = getInterfaceLanguage(interfaceLanguage).promptName
+  const list = sentences.map((s, i) => `${i + 1}. ${s.text} — ${s.translation}`).join('\n')
+
+  return `A student at level ${level} (native language: ${uiLang}) has just studied these ${langName} sentences:
+
+${list}
+
+Create a short essay assignment so the student practises exactly this material:
+- topic: one engaging essay topic in ${uiLang}, connected to the situation of these sentences but asking the student to write about their own life or opinion (max 12 words). No quotes.
+- words: 6–8 useful words or short phrases taken from the sentences above, in ${langName} exactly as they appear (verbs may be given in the form used), each with a translation into ${uiLang}. Prefer the most useful vocabulary and patterns; skip names and trivial words.`
+}
+
+export const ESSAY_TOPIC_SCHEMA = {
+  type: 'object',
+  properties: {
+    topic: { type: 'string' },
+    words: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { text: { type: 'string' }, translation: { type: 'string' } },
+        required: ['text', 'translation'],
+      },
+    },
+  },
+  required: ['topic', 'words'],
+}

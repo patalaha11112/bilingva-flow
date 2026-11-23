@@ -2,7 +2,19 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Volume2, ChevronRight, Check, Plus, ArrowLeft, Loader2, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
+import { Volume2, ChevronRight, Check, ArrowLeft, Loader2, SkipForward } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { useUser } from '@/hooks/use-user'
 import { useSentences } from '@/hooks/use-sentences'
 import { useT } from '@/hooks/use-t'
@@ -34,14 +46,13 @@ export default function SentencesPage() {
     isLoading,
     isGenerating,
     error,
-    weeklyCount,
-    weeklyLimit,
+    set,
     limitReached,
     markPartUnderstood,
     markAllUnderstood,
-    nextSentence,
+    markViewed,
     addMoreSentences,
-    refreshSentences,
+    skipSet,
     refetch,
   } = useSentences({
     language,
@@ -65,6 +76,7 @@ export default function SentencesPage() {
         level={level}
         onMarkPart={markPartUnderstood}
         onMarkAll={markAllUnderstood}
+        onViewed={markViewed}
         onNext={() => {
           if (trainIndex < sentences.length - 1) {
             setTrainIndex(prev => prev + 1)
@@ -88,21 +100,22 @@ export default function SentencesPage() {
       level={level}
       language={language}
       isGenerating={isGenerating}
-      weeklyCount={weeklyCount}
-      weeklyLimit={weeklyLimit}
+      setSize={set?.size ?? sentences.length}
+      setMax={set?.max ?? 10}
+      completedToday={!!set?.completedToday}
       limitReached={limitReached}
       onStartTrain={() => {
         setTrainIndex(0)
         setMode('train')
       }}
       onAddMore={addMoreSentences}
-      onRefresh={refreshSentences}
+      onSkip={skipSet}
     />
   )
 }
 
 // ─────────────────────────────────────────────
-// LIST VIEW — this week's sentences
+// LIST VIEW — the current set
 // ─────────────────────────────────────────────
 
 function ListView({
@@ -111,28 +124,30 @@ function ListView({
   level,
   language,
   isGenerating,
-  weeklyCount,
-  weeklyLimit,
+  setSize,
+  setMax,
+  completedToday,
   limitReached,
   onStartTrain,
   onAddMore,
-  onRefresh,
+  onSkip,
 }: {
   sentences: SentenceWithParts[]
   userProgress: Record<string, any>
   level: Level
   language: LearningLang
   isGenerating: boolean
-  weeklyCount: number
-  weeklyLimit: number
+  setSize: number
+  setMax: number
+  completedToday: boolean
   limitReached: boolean
   onStartTrain: () => void
   onAddMore: () => void
-  onRefresh: () => void
+  onSkip: () => void
 }) {
   const { t } = useT()
   const ui = t.sentences
-  const canAddMore = weeklyCount < weeklyLimit && !limitReached
+  const canAddMore = setSize < setMax && !limitReached
 
   return (
     <div className="mx-auto max-w-lg space-y-4 px-4 py-6">
@@ -142,23 +157,43 @@ function ListView({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{ui.title}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {getLearningLanguage(language).flag} {level}
+            {getLearningLanguage(language).flag} {level} · {ui.setLabel(sentences.length)}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onRefresh}
-            disabled={isGenerating || limitReached}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={ui.refresh}
-          >
-            <RefreshCw className={cn('h-4 w-4', isGenerating && 'animate-spin')} />
-          </button>
-          <div className="text-sm font-medium text-muted-foreground">
-            {sentences.length}/{weeklyLimit}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button
+              disabled={isGenerating || limitReached}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <SkipForward className="h-3.5 w-3.5" />
+              {ui.skipSet}
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{ui.skipConfirmTitle}</AlertDialogTitle>
+              <AlertDialogDescription>{ui.skipConfirmText}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+              <AlertDialogAction onClick={onSkip}>{ui.skipSet}</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
+      {/* Set completed: the next set opens tomorrow */}
+      {completedToday && (
+        <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-4 space-y-3">
+          <p className="text-sm font-medium text-green-700 dark:text-green-400">{ui.setComplete}</p>
+          <p className="text-xs text-muted-foreground">{ui.nextSteps}</p>
+          <div className="flex gap-2">
+            <Button asChild size="sm" variant="outline"><Link href="/back-t">{t.nav.backT}</Link></Button>
+            <Button asChild size="sm" variant="outline"><Link href="/essay">{t.nav.essay}</Link></Button>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Sentence list */}
       <div className="space-y-2">
@@ -235,7 +270,7 @@ function ListView({
         </button>
       ) : (
         <div className="w-full rounded-2xl border border-dashed border-amber-500/30 bg-amber-500/5 py-3 px-4 text-sm text-amber-700 dark:text-amber-400 text-center">
-          {limitReached ? ui.weeklyLimitReached : ui.activeLimitReached}
+          {limitReached ? ui.dailyLimitReached : ui.setMaxReached}
         </div>
       )}
 
@@ -264,6 +299,7 @@ function TrainView({
   level,
   onMarkPart,
   onMarkAll,
+  onViewed,
   onNext,
   onBack,
 }: {
@@ -273,6 +309,7 @@ function TrainView({
   level: Level
   onMarkPart: (sentenceId: string, partId: string) => Promise<void>
   onMarkAll: (sentenceId: string) => Promise<void>
+  onViewed: (sentenceId: string) => void
   onNext: () => void
   onBack: () => void
 }) {
@@ -349,7 +386,10 @@ function TrainView({
           <Button
             variant="outline"
             className="w-full"
-            onClick={() => setShowBreakdown(true)}
+            onClick={() => {
+              setShowBreakdown(true)
+              onViewed(sentence.id)
+            }}
           >
             {ui.showBreakdown}
           </Button>

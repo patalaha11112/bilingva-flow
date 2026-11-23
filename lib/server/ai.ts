@@ -21,6 +21,8 @@ export const AI_MODELS = {
   sentences: process.env.GEMINI_MODEL_SENTENCES || 'gemini-4-hydrogen',
   essay: process.env.GEMINI_MODEL_ESSAY || 'gemini-4-hydrogen',
   backTranslation: process.env.GEMINI_MODEL_BACK_TRANSLATION || 'gemini-4-hydrogen',
+  // Once per set; flash-lite mistranslated words here, so the better model is worth it
+  essayTopic: process.env.GEMINI_MODEL_ESSAY_TOPIC || 'gemini-4-hydrogen',
 } as const
 
 const TIMEOUT_MS = 60_000

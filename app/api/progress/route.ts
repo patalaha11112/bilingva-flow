@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ProgressBody, parseBody } from "@/lib/server/validation";
-import { markActivity } from "@/lib/server/activity";
+import { updateSetCompletion } from "@/lib/server/sentences";
 
 /**
  * Saves which parts of a sentence the user understands.
@@ -27,15 +27,6 @@ export async function POST(request: NextRequest) {
     const allPartIds = new Set((partsData ?? []).map((p: { id: string }) => p.id));
     const newParts = [...new Set(understood_parts)].filter((id) => allPartIds.has(id));
     const allUnderstood = allPartIds.size > 0 && newParts.length === allPartIds.size;
-
-    // Previous state, to count a sentence in today's activity when it becomes fully understood
-    const { data: before } = await supabase
-      .from("user_sentences")
-      .select("all_understood")
-      .eq("user_id", user.id)
-      .eq("sentence_id", sentence_id)
-      .maybeSingle();
-    const wasUnderstood = before?.all_understood ?? false;
 
     const fields = {
       understood_parts: newParts,
@@ -71,9 +62,8 @@ export async function POST(request: NextRequest) {
       progress = inserted;
     }
 
-    if (allUnderstood !== wasUnderstood) {
-      await markActivity(user.id, language, tz, { sentencesDone: allUnderstood ? 1 : -1 });
-    }
+    // The set is completed when all its sentences are understood
+    if (progress?.set_id) await updateSetCompletion(supabase, user.id, progress.set_id, tz);
 
     return NextResponse.json({ progress });
   } catch (error) {

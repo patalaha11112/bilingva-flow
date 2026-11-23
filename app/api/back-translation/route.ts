@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { parseQuery, BackTQuery } from '@/lib/server/validation'
 import { localDate } from '@/lib/server/activity'
-import {
-  BACK_T_MAX_PER_DAY,
-  candidateSentenceIds,
-  dailyTarget,
-  loadSentences,
-} from '@/lib/server/back-translation'
+import { candidateSentenceIds, loadSentences } from '@/lib/server/back-translation'
+import { BACK_T_MAX_PER_DAY, DAILY_GOALS } from '@/lib/daily-goals'
 import type { BackTFeedback, BackTState } from '@/types/back-translation'
 
 /** Today's Back-T: sentences waiting for step 2, today's step 1, and today's results */
@@ -19,10 +15,10 @@ export async function GET(request: NextRequest) {
 
     const parsed = parseQuery(request.nextUrl.searchParams, BackTQuery)
     if (parsed.error) return parsed.error
-    const { language, interface_lang: interfaceLang, level, tz, count } = parsed.data
+    const { language, interface_lang: interfaceLang, tz, count } = parsed.data
 
     const today = localDate(tz)
-    const target = dailyTarget(level)
+    const target = DAILY_GOALS.backTranslations
     const wanted = Math.min(Math.max(count ?? target, target), BACK_T_MAX_PER_DAY)
 
     const { data: rowsData, error } = await supabase

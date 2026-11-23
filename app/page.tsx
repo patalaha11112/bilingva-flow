@@ -8,10 +8,10 @@ import { useUser } from '@/hooks/use-user'
 import { WeekProgress } from '@/components/week-progress'
 import { useT } from '@/hooks/use-t'
 import { getLearningLanguage } from '@/lib/languages'
-import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HomeTopSection } from '@/components/home-top-section'
 import { ActivityArchive } from '@/components/activity-archive'
+import { TodayPlan } from '@/components/today-plan'
 
 export default function Home() {
   const router = useRouter()
@@ -58,6 +58,8 @@ export default function Home() {
         stats={stats}
       />
 
+      <TodayPlan />
+
       {/* Alphabet */}
       {getLearningLanguage(learningLang).hasAlphabet && (
         <Link
@@ -96,11 +98,6 @@ export default function Home() {
           <p className="text-sm leading-relaxed text-foreground/80">{tip}</p>
         </section>
       )}
-
-      {/* Start button */}
-      <Button asChild className="w-full h-12 text-base font-medium">
-        <Link href="/sentences">{t.home.startExercise}</Link>
-      </Button>
 
     </div>
   )

@@ -22,8 +22,16 @@ export const SentencesBody = z.object({
   interface_language: interfaceLang,
   topic_id: z.string().uuid().nullish().transform((v) => v ?? undefined),
   custom_topic: z.string().max(500).nullish().transform((v) => v ?? undefined),
-  refresh: z.boolean().optional(),
+  /** Replace the current set with a new one */
+  skip: z.boolean().optional(),
   add_count: z.number().int().min(1).max(100).optional(),
+  tz: timeZone,
+})
+
+export const ViewBody = z.object({
+  sentence_id: z.string().uuid(),
+  language: learningLang,
+  tz: timeZone,
 })
 
 export const ProgressBody = z.object({
@@ -46,7 +54,6 @@ export const EssayBody = z.object({
 export const BackTQuery = z.object({
   language: learningLang,
   interface_lang: interfaceLang.catch(DEFAULT_INTERFACE_LANG),
-  level,
   tz: timeZone,
   /** How many new sentences to offer today (the level's default up to the daily max) */
   count: z.coerce.number().int().min(1).max(10).optional(),
@@ -57,7 +64,6 @@ export const BackTForwardBody = z.object({
   text: z.string().trim().min(1).max(1000),
   language: learningLang,
   interface_language: interfaceLang,
-  level,
   tz: timeZone,
 })
 

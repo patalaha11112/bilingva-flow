@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    await updateBackTRing(supabase, user.id, language, level, tz)
+    await updateBackTRing(supabase, user.id, language, row.interface_language as InterfaceLang, tz)
 
     const result: BackTDone = { id: row.id, forward_text: row.forward_text, back_text: text, feedback, sentence }
     return NextResponse.json(result)
