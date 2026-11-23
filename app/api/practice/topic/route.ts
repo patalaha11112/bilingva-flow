@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import type { InterfaceLang, LearningLang } from '@/types/database'
 import { DEFAULT_INTERFACE_LANG } from '@/lib/languages'
 
@@ -29,7 +28,6 @@ function getWeekStart(date: Date = new Date()): string {
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const supabaseAdmin = createAdminClient()
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -44,7 +42,7 @@ export async function GET(request: NextRequest) {
     const { week, year } = getISOWeek(new Date())
 
     // Check if essay done today (non-bonus)
-    const { data: todayActivity } = await supabaseAdmin
+    const { data: todayActivity } = await supabase
       .from('user_daily_activity')
       .select('essay_done')
       .eq('user_id', user.id)
@@ -57,7 +55,7 @@ export async function GET(request: NextRequest) {
     // Find most practiced topic from this week's sentences
     let topic = ''
 
-    const { data: userSentences } = await supabaseAdmin
+    const { data: userSentences } = await supabase
       .from('user_sentences')
       .select('sentence_id')
       .eq('user_id', user.id)
@@ -68,7 +66,7 @@ export async function GET(request: NextRequest) {
     if (userSentences && userSentences.length > 0) {
       const sentenceIds = userSentences.map(us => us.sentence_id)
 
-      const { data: sentences } = await supabaseAdmin
+      const { data: sentences } = await supabase
         .from('sentences')
         .select('topic_id')
         .in('id', sentenceIds)
@@ -83,7 +81,7 @@ export async function GET(request: NextRequest) {
         const topTopicId = Object.entries(topicCount).sort((a, b) => b[1] - a[1])[0]?.[0]
 
         if (topTopicId) {
-          const { data: topicData } = await supabaseAdmin
+          const { data: topicData } = await supabase
             .from('topics')
             .select('name_ru, name_en, name_es')
             .eq('id', topTopicId)
@@ -106,7 +104,7 @@ export async function GET(request: NextRequest) {
     // Suggested words: parts the user hasn't marked as understood (all recent sentences)
     let suggestedWords: { text: string; translation: string }[] = []
 
-    const { data: weekUserSentences } = await supabaseAdmin
+    const { data: weekUserSentences } = await supabase
       .from('user_sentences')
       .select('sentence_id, understood_parts')
       .eq('user_id', user.id)
@@ -121,7 +119,7 @@ export async function GET(request: NextRequest) {
       }
 
       const sentenceIds = weekUserSentences.map(us => us.sentence_id)
-      const { data: allParts, error: partsError } = await supabaseAdmin
+      const { data: allParts, error: partsError } = await supabase
         .from('sentence_parts')
         .select('id, sentence_id, text, translation_ru, translation_en')
         .in('sentence_id', sentenceIds)

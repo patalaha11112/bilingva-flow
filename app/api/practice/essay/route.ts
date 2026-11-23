@@ -24,6 +24,7 @@ function countWords(text: string): number {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    // Admin client only for writes to tables users can read but not write (scores, activity)
     const supabaseAdmin = createAdminClient()
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
       }
       const dayStart = new Date()
       dayStart.setUTCHours(0, 0, 0, 0)
-      const { count: essaysToday } = await supabaseAdmin
+      const { count: essaysToday } = await supabase
         .from('user_essays')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)

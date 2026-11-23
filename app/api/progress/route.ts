@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import type { LearningLang } from "@/types/database";
 
 /**
@@ -11,7 +10,6 @@ import type { LearningLang } from "@/types/database";
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const supabaseAdmin = createAdminClient();
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -26,7 +24,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
-    const { data: partsData } = await supabaseAdmin
+    const { data: partsData } = await supabase
       .from("sentence_parts")
       .select("id")
       .eq("sentence_id", sentence_id);
@@ -41,7 +39,7 @@ export async function POST(request: NextRequest) {
       last_shown_at: new Date().toISOString(),
     };
 
-    const { data: updated, error: updateError } = await supabaseAdmin
+    const { data: updated, error: updateError } = await supabase
       .from("user_sentences")
       .update(fields)
       .eq("user_id", user.id)
@@ -57,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // Normally the row is created when the sentence is shown; create it if missing
     if (!progress) {
-      const { data: inserted, error: insertError } = await supabaseAdmin
+      const { data: inserted, error: insertError } = await supabase
         .from("user_sentences")
         .insert({ user_id: user.id, sentence_id, language, is_active: true, ...fields })
         .select()
