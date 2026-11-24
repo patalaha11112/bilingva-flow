@@ -54,9 +54,7 @@ async function ensureItems(language: LearningLang, interfaceLanguage: InterfaceL
   const generated = await generateJson<Omit<ItemRow, 'id'>[]>(
     AI_MODELS.placementItems,
     placementItemsPrompt({ language, interfaceLanguage }),
-    PLACEMENT_ITEMS_SCHEMA,
-    // Built once and shown to everyone: worth waiting for the better model
-    { fallback: false }
+    PLACEMENT_ITEMS_SCHEMA
   )
   const rows = generated
     .filter((g) => g.sentence_text?.trim() && g.translation?.trim() && g.variant >= 0 && g.variant < VARIANTS)
