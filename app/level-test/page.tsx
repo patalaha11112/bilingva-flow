@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Check, ChevronRight, Loader2, Sparkles, Target, Volume2, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronRight, Loader2, Sparkles, Target, Volume2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/hooks/use-user'
 import { useT } from '@/hooks/use-t'
@@ -172,6 +172,7 @@ function LevelTest() {
   // ── Step 1: understanding ─────────────────
   if (phase === 'understand') {
     const item = test.understand[index]
+    const allSelected = selected.size === item.parts.length
     return (
       <Screen onBack={exit} backLabel={ui.exit} step={1} progress={(index + 1) / test.understand.length}>
         <StepTitle step={ui.step(1)} title={ui.understandTitle} hint={ui.understandHint} />
@@ -186,6 +187,18 @@ function LevelTest() {
               <Volume2 className="h-4 w-4" />
             </button>
           </div>
+          <button
+            onClick={() => setSelected(allSelected ? new Set() : new Set(item.parts.map((_, i) => i)))}
+            className="flex items-center gap-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <span className={cn(
+              'flex h-4 w-4 items-center justify-center rounded border transition-colors',
+              allSelected ? 'border-green-500 bg-green-500 text-white' : 'border-muted-foreground/40'
+            )}>
+              {allSelected && <Check className="h-3 w-3" />}
+            </span>
+            {ui.selectAll}
+          </button>
           <div className="flex flex-wrap gap-2">
             {item.parts.map((part, i) => {
               const on = selected.has(i)
@@ -210,15 +223,7 @@ function LevelTest() {
             })}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={() => answerUnderstand(0)}>
-            <X className="mr-1 h-4 w-4" /> {ui.understandNone}
-          </Button>
-          <Button variant="outline" onClick={() => answerUnderstand(item.parts.length)}>
-            <Check className="mr-1 h-4 w-4" /> {ui.understandAll}
-          </Button>
-        </div>
-        <Button className="h-12 w-full text-base" disabled={selected.size === 0} onClick={() => answerUnderstand(selected.size)}>
+        <Button className="h-12 w-full text-base" onClick={() => answerUnderstand(selected.size)}>
           {ui.next} <ChevronRight className="ml-1 h-4 w-4" />
         </Button>
       </Screen>
