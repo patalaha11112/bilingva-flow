@@ -86,16 +86,6 @@ export function WeeklyReportCard() {
       {r ? (
         <>
           <p className="text-sm font-medium leading-snug">{r.headline}</p>
-          {r.focus_areas.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {r.focus_areas.map(f => (
-                <span key={f.title} className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                  <Target className="h-3 w-3" />
-                  {f.title}
-                </span>
-              ))}
-            </div>
-          )}
           <LevelSuggestion report={latest} onAnswered={markAnswered} />
         </>
       ) : (

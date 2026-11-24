@@ -5,6 +5,7 @@ import { WEEKLY_REPORT_SCHEMA, weeklyReportPrompt } from '@/lib/server/prompts'
 import { addDays, localDate, weekStartOf } from '@/lib/server/activity'
 import { loadSentences } from '@/lib/server/back-translation'
 import { DAILY_GOALS } from '@/lib/daily-goals'
+import { getCurrentFocus } from '@/lib/focus'
 import type { InterfaceLang, LearningLang, Level } from '@/types/database'
 import type { ReportContent, WeeklyReport, WeeklyStats } from '@/types/weekly-report'
 
@@ -43,34 +44,10 @@ export async function listReports(supabase: SupabaseClient, userId: string, lang
   return (data ?? []).map(toReport)
 }
 
-/** Patterns to practise: from the newest weekly report or level test of the last two weeks */
+/** Patterns to practise: from the current focus (newest weekly review or level test) */
 export async function getFocusHints(supabase: SupabaseClient, userId: string, language: LearningLang): Promise<string[]> {
-  const since = new Date(Date.now() - 15 * 86_400_000).toISOString()
-  const [{ data: report }, { data: test }] = await Promise.all([
-    supabase
-      .from('weekly_reports')
-      .select('report, created_at')
-      .eq('user_id', userId)
-      .eq('language', language)
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('placement_results')
-      .select('result, created_at')
-      .eq('user_id', userId)
-      .eq('language', language)
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ])
-  const latest = test && (!report || test.created_at > report.created_at)
-    ? (test.result as { focus_areas?: { prompt_hint: string }[] })
-    : (report?.report as ReportContent | null)
-  const areas = latest?.focus_areas ?? []
-  return areas.map((a) => a.prompt_hint).filter(Boolean).slice(0, 3)
+  const focus = await getCurrentFocus(supabase, userId, language)
+  return (focus?.areas ?? []).map((a) => a.prompt_hint).filter(Boolean).slice(0, 3)
 }
 
 /** The report for last week: existing, freshly built, or null when the user wasn't active */

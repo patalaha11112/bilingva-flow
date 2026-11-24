@@ -83,6 +83,12 @@ export const es: Messages = {
       essayHint: 'Un ensayo con las palabras del conjunto',
       allDone: '¡Día completado! 🎉',
     },
+    focus: {
+      title: 'Enfoque de la semana',
+      fromTest: 'Según tu prueba de nivel',
+      fromReport: 'Según el resumen de la semana pasada',
+      hint: 'Estos temas aparecen más en las frases y redacciones',
+    },
     tipOfDay: 'Consejo del día',
     finishProfileSetup: 'Terminando de configurar tu perfil…',
   },

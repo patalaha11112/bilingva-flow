@@ -13,6 +13,7 @@ import { HomeTopSection } from '@/components/home-top-section'
 import { ActivityArchive } from '@/components/activity-archive'
 import { TodayPlan } from '@/components/today-plan'
 import { WeeklyReportCard } from '@/components/weekly-report'
+import { FocusCard } from '@/components/focus-card'
 
 export default function Home() {
   const router = useRouter()
@@ -60,6 +61,8 @@ export default function Home() {
       />
 
       <TodayPlan />
+
+      <FocusCard />
 
       <WeeklyReportCard />
 
