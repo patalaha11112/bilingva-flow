@@ -8,6 +8,7 @@ import { useUser } from '@/hooks/use-user'
 import { useT } from '@/hooks/use-t'
 import { cn } from '@/lib/utils'
 import { dayHeading, getTimeZone, parseLocalDate } from '@/lib/format'
+import { cacheGet, cacheKey, cacheSet } from '@/lib/client-cache'
 import { getInterfaceLanguage, getLearningLanguage } from '@/lib/languages'
 import { speak } from '@/lib/speech'
 import { GlossSentence } from '@/components/gloss-sentence'
@@ -22,7 +23,8 @@ export default function BackTPage() {
   const { user, interfaceLang, learningLang, level, isLoading: userLoading, refetch: refetchUser } = useUser()
   const { t } = useT()
 
-  const [state, setState] = useState<BackTState | null>(null)
+  const key = cacheKey(user?.id, 'back-t', learningLang, interfaceLang)
+  const [state, setState] = useState<BackTState | null>(() => cacheGet<BackTState>(key) ?? null)
   const [count, setCount] = useState<number | null>(null)
   const [loadError, setLoadError] = useState(false)
 
@@ -50,6 +52,11 @@ export default function BackTPage() {
   useEffect(() => {
     if (!userLoading && user) load()
   }, [userLoading, user, load])
+
+  // Shown at once on the next visit, then refreshed by load()
+  useEffect(() => {
+    if (state) cacheSet(key, state)
+  }, [key, state])
 
   if (userLoading || (!state && !loadError)) return <BackTSkeleton />
 

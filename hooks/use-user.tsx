@@ -5,6 +5,7 @@ import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { parseLocalDate, toDateString } from '@/lib/format'
 import { DAILY_GOALS } from '@/lib/daily-goals'
+import { cacheClear } from '@/lib/client-cache'
 import {
   DEFAULT_INTERFACE_LANG,
   DEFAULT_LEARNING_LANG,
@@ -91,7 +92,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setError(null)
 
       const { data: { user: authUser } } = await supabase.auth.getUser()
+      const previousUserId = loadedUserId.current
       loadedUserId.current = authUser?.id ?? null
+      // Another account (or signed out): drop the previous user's cached pages
+      if (previousUserId !== undefined && previousUserId !== loadedUserId.current) cacheClear()
       if (!authUser) {
         setUser(null)
         setProfile(null)

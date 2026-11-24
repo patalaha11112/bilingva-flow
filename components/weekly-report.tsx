@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { useT } from '@/hooks/use-t'
 import { useUser } from '@/hooks/use-user'
 import { getTimeZone, weekRange } from '@/lib/format'
+import { cacheGet, cacheKey, cacheSet } from '@/lib/client-cache'
 import { LEVELS } from '@/core/constants'
 import { Button } from '@/components/ui/button'
 import type { WeeklyReport, WeeklyStats } from '@/types/weekly-report'
@@ -15,28 +16,33 @@ import type { WeeklyReport, WeeklyStats } from '@/types/weekly-report'
 // Data
 // ─────────────────────────────────────────────
 
+type ReportsData = { latest: WeeklyReport | null; history: WeeklyReport[] }
+
 /** Latest weekly report (last week's is built on the first request on or after Monday) */
 export function useWeeklyReports({ history = false } = {}) {
   const { user, interfaceLang, learningLang, level, isLoading: userLoading } = useUser()
-  const [latest, setLatest] = useState<WeeklyReport | null>(null)
-  const [older, setOlder] = useState<WeeklyReport[]>([])
-  const [loading, setLoading] = useState(true)
+  const key = cacheKey(user?.id, 'report', learningLang, interfaceLang, level, history ? 'h' : '')
+  const cached = cacheGet<ReportsData>(key)
+  const [latest, setLatest] = useState<WeeklyReport | null>(cached?.latest ?? null)
+  const [older, setOlder] = useState<WeeklyReport[]>(cached?.history ?? [])
+  const [loading, setLoading] = useState(!cached)
 
   const load = useCallback(async () => {
-    setLoading(true)
+    if (!cacheGet(key)) setLoading(true)
     try {
       const params = new URLSearchParams({ language: learningLang, interface_lang: interfaceLang, level, tz: getTimeZone() })
       if (history) params.set('history', '1')
       const res = await fetch(`/api/report?${params}`)
       if (res.ok) {
-        const data = await res.json() as { latest: WeeklyReport | null; history: WeeklyReport[] }
+        const data = await res.json() as ReportsData
+        cacheSet(key, data)
         setLatest(data.latest)
         setOlder(data.history)
       }
     } finally {
       setLoading(false)
     }
-  }, [learningLang, interfaceLang, level, history])
+  }, [learningLang, interfaceLang, level, history, key])
 
   useEffect(() => {
     if (!userLoading && user) load()
@@ -44,6 +50,8 @@ export function useWeeklyReports({ history = false } = {}) {
 
   const markAnswered = (id: string) => {
     setLatest(r => r && r.id === id ? { ...r, level_suggestion_answered: true } : r)
+    const c = cacheGet<ReportsData>(key)
+    if (c?.latest?.id === id) cacheSet(key, { ...c, latest: { ...c.latest, level_suggestion_answered: true } })
     fetch('/api/report/answer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

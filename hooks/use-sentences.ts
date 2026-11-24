@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getTimeZone } from '@/lib/format'
+import { cacheGet, cacheKey, cacheSet } from '@/lib/client-cache'
+import { useUser } from '@/hooks/use-user'
 import type {
   SentenceWithParts,
   UserSentence,
@@ -44,6 +46,8 @@ interface UseSentencesParams {
   enabled?: boolean
 }
 
+type Cached = { sentences: SentenceWithParts[]; userProgress: Record<string, UserSentence>; set: SetInfo }
+
 type SetResponse = {
   sentences: SentenceWithParts[]
   userProgress?: Record<string, UserSentence>
@@ -56,10 +60,14 @@ export function useSentences({
   interfaceLanguage,
   enabled = true,
 }: UseSentencesParams): UseSentencesReturn {
-  const [sentences, setSentences] = useState<SentenceWithParts[]>([])
-  const [userProgress, setUserProgress] = useState<Record<string, UserSentence>>({})
-  const [set, setSet] = useState<SetInfo | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { user } = useUser()
+  const key = cacheKey(user?.id, 'sentences', language, level, interfaceLanguage)
+  const cached = cacheGet<Cached>(key)
+
+  const [sentences, setSentences] = useState<SentenceWithParts[]>(cached?.sentences ?? [])
+  const [userProgress, setUserProgress] = useState<Record<string, UserSentence>>(cached?.userProgress ?? {})
+  const [set, setSet] = useState<SetInfo | null>(cached?.set ?? null)
+  const [isLoading, setIsLoading] = useState(!cached)
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [limitReached, setLimitReached] = useState(false)
@@ -91,8 +99,12 @@ export function useSentences({
 
   const fetchSentences = useCallback(async () => {
     if (!enabled) return
-    setIsLoading(true)
-    setIsGenerating(true)
+    // With cached data the page stays on screen and refreshes quietly
+    const hasCache = !!cacheGet(key)
+    if (!hasCache) {
+      setIsLoading(true)
+      setIsGenerating(true)
+    }
     setError(null)
     try {
       await request()
@@ -102,11 +114,16 @@ export function useSentences({
       setIsGenerating(false)
       setIsLoading(false)
     }
-  }, [enabled, request])
+  }, [enabled, request, key])
 
   useEffect(() => {
     fetchSentences()
   }, [fetchSentences])
+
+  // Keep the cache in step with what is on screen (including progress clicks)
+  useEffect(() => {
+    if (set) cacheSet<Cached>(key, { sentences, userProgress, set })
+  }, [key, sentences, userProgress, set])
 
   const runAction = async (action: { add_count?: number; skip?: boolean }) => {
     if (!enabled) return

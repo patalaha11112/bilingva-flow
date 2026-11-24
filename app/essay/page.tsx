@@ -5,6 +5,7 @@ import { Loader2, Star } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
 import { useT } from '@/hooks/use-t'
 import { getTimeZone, plural } from '@/lib/format'
+import { cacheGet, cacheKey, cacheSet } from '@/lib/client-cache'
 import { cn } from '@/lib/utils'
 
 type Phase = 'loading' | 'writing' | 'analyzing' | 'feedback' | 'done_today'
@@ -34,13 +35,17 @@ interface FeedbackData {
   fun_fact: string
 }
 
+type TopicData = { topic: string; suggested_words: SuggestedWord[]; essay_done_today: boolean }
+
 export default function EssayPage() {
-  const { interfaceLang: lang, learningLang, level, isLoading: userLoading } = useUser()
+  const { user, interfaceLang: lang, learningLang, level, isLoading: userLoading } = useUser()
   const { t, locale } = useT()
 
-  const [phase, setPhase] = useState<Phase>('loading')
-  const [topic, setTopic] = useState('')
-  const [suggestedWords, setSuggestedWords] = useState<SuggestedWord[]>([])
+  const key = cacheKey(user?.id, 'essay-topic', learningLang, lang)
+  const cached = cacheGet<TopicData>(key)
+  const [phase, setPhase] = useState<Phase>(cached ? (cached.essay_done_today ? 'done_today' : 'writing') : 'loading')
+  const [topic, setTopic] = useState(cached?.topic ?? '')
+  const [suggestedWords, setSuggestedWords] = useState<SuggestedWord[]>(cached?.suggested_words ?? [])
   const [content, setContent] = useState('')
   const [isBonus, setIsBonus] = useState(false)
   const [feedbackData, setFeedbackData] = useState<FeedbackData | null>(null)
@@ -55,22 +60,24 @@ export default function EssayPage() {
   }, [userLoading, learningLang]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchTopic = async () => {
-    setPhase('loading')
+    // With a cached topic the page stays on screen and refreshes quietly
+    const quiet = !!cacheGet(key)
+    if (!quiet) setPhase('loading')
     try {
       const res = await fetch(
         `/api/practice/topic?language=${learningLang}&interface_lang=${lang}&tz=${encodeURIComponent(getTimeZone())}`
       )
       if (!res.ok) throw new Error('Failed')
-      const data = await res.json() as {
-        topic: string
-        suggested_words: SuggestedWord[]
-        essay_done_today: boolean
-      }
+      const data = await res.json() as TopicData
+      cacheSet(key, data)
       setTopic(data.topic)
       setSuggestedWords(data.suggested_words ?? [])
-      setPhase(data.essay_done_today ? 'done_today' : 'writing')
+      // A quiet refresh never interrupts an essay being checked or its feedback
+      setPhase(p => p === 'loading' || p === 'writing' || p === 'done_today'
+        ? (data.essay_done_today ? 'done_today' : 'writing')
+        : p)
     } catch {
-      setPhase('writing')
+      if (!quiet) setPhase('writing')
     }
   }
 
@@ -112,6 +119,8 @@ export default function EssayPage() {
         fun_fact: data.fun_fact ?? '',
       })
       setPhase('feedback')
+      const c = cacheGet<TopicData>(key)
+      if (c) cacheSet(key, { ...c, essay_done_today: true })
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : t.practice.errors.generic)
       setPhase('writing')
