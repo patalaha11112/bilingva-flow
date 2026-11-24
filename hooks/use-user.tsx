@@ -114,8 +114,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
       if (profileError) {
         console.error('profile fetch:', profileError)
         setProfile(null)
+      } else if (profileData) {
+        setProfile(profileData)
       } else {
-        setProfile(profileData ?? null)
+        // No profile row (it can be missed on sign-up): create it for this user
+        const { data: created, error: ensureError } = await supabase
+          .rpc('ensure_profile', { p_interface_language: detectBrowserLang() })
+        if (ensureError) console.error('ensure profile:', ensureError)
+        setProfile((created as UserProfile | null) ?? null)
       }
 
       // Active language settings
