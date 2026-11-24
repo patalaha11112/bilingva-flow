@@ -17,7 +17,7 @@ export function BottomNav() {
   const pathname = usePathname()
   const { t } = useT()
 
-  const hidden = ['/login', '/register'].includes(pathname)
+  const hidden = ['/login', '/register', '/welcome', '/level-test'].includes(pathname)
   if (hidden) return null
 
   return (

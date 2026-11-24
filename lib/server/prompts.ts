@@ -268,6 +268,7 @@ export function essayTopicPrompt({
   level,
   sentences,
   focus = [],
+  aboutMe,
 }: {
   language: LearningLang
   interfaceLanguage: InterfaceLang
@@ -276,6 +277,8 @@ export function essayTopicPrompt({
   sentences: { text: string; translation: string }[]
   /** Patterns from the latest weekly report to practise */
   focus?: string[]
+  /** The student's own "about me" text (already sanitized) */
+  aboutMe?: string
 }): string {
   const langName = getLearningLanguage(language).prompt.name
   const uiLang = getInterfaceLanguage(interfaceLanguage).promptName
@@ -288,6 +291,7 @@ ${list}
 Create a short essay assignment so the student practises exactly this material:
 - topic: one engaging essay topic in ${uiLang}, connected to the situation of these sentences but asking the student to write about their own life or opinion (max 12 words). No quotes.
 ${focus.length ? `- The student is also working on: ${focus.join('; ')}. Choose a topic that naturally needs these patterns.
+` : ''}${aboutMe ? `- About the student (from their own words): "${aboutMe}". Make the topic personal and relevant to their life when it fits naturally.
 ` : ''}- words: 6–8 useful words or short phrases taken from the sentences above, in ${langName} exactly as they appear (verbs may be given in the form used), each with a translation into ${uiLang}. Prefer the most useful vocabulary and patterns; skip names and trivial words.`
 }
 
@@ -401,4 +405,144 @@ export const WEEKLY_REPORT_SCHEMA = {
     encouragement: { type: 'string' },
   },
   required: ['headline', 'level_estimate', 'confidence', 'level_comment', 'strengths', 'known', 'focus_areas', 'encouragement'],
+}
+
+// ─────────────────────────────────────────────
+// Level test (placement)
+// ─────────────────────────────────────────────
+
+export function placementItemsPrompt({
+  language,
+  interfaceLanguage,
+}: {
+  language: LearningLang
+  interfaceLanguage: InterfaceLang
+}): string {
+  const langName = getLearningLanguage(language).prompt.name
+  const uiLang = getInterfaceLanguage(interfaceLanguage).promptName
+
+  return `You are an experienced ${langName} examiner (CEFR). Create sentences for a short placement test for a learner whose native language is ${uiLang}.
+
+1. "understand": 12 sentences — exactly 2 for each level A1, A2, B1, B2, C1, C2 (variant 0 and 1).
+   - Each sentence must be clearly and typically at its level: vocabulary, grammar and length grow with the level
+     (A1: 4–7 very common words, present tense; C2: idiomatic, nuanced, complex syntax).
+   - Everyday, neutral topics (no names of real people, no politics).
+   - Split each into 2–5 meaningful chunks (subject, verb phrase, object, adverbial…); chunks joined with spaces give the sentence.
+   - Give each chunk and the whole sentence a natural translation into ${uiLang}.
+
+2. "translate": 6 sentences — exactly 2 for each band: "A2" (A1–A2), "B2" (B1–B2), "C1" (C1–C2), variants 0 and 1.
+   - Different from the "understand" sentences. One sentence each, typical of the band.
+   - Give a natural reference translation into ${uiLang}; parts must be an empty array.
+
+All sentence_text in ${langName}; all translations in ${uiLang}.`
+}
+
+export const PLACEMENT_ITEMS_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      kind: { type: 'string', enum: ['understand', 'translate'] },
+      level: { type: 'string', enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] },
+      variant: { type: 'integer', enum: [0, 1] },
+      sentence_text: { type: 'string' },
+      translation: { type: 'string' },
+      parts: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { text: { type: 'string' }, translation: { type: 'string' } },
+          required: ['text', 'translation'],
+        },
+      },
+    },
+    required: ['kind', 'level', 'variant', 'sentence_text', 'translation', 'parts'],
+  },
+}
+
+export interface PlacementInput {
+  language: LearningLang
+  interfaceLanguage: InterfaceLang
+  /** Self-reported understanding per level (0–1); levels not shown are omitted */
+  understanding: { level: Level; sentence: string; understood: number }[]
+  /** null text = "I don't know" */
+  translations: { band: string; sentence: string; reference: string; attempt: string | null }[]
+  /** null = "I can't write yet" */
+  essay: string | null
+  /** The current "about me" text, to revise */
+  aboutMe: string | null
+}
+
+export function placementPrompt(input: PlacementInput): string {
+  const langName = getLearningLanguage(input.language).prompt.name
+  const uiLang = getInterfaceLanguage(input.interfaceLanguage).promptName
+
+  const understanding = input.understanding
+    .map((u) => `- ${u.level}: "${u.sentence}" — student says they understood ${Math.round(u.understood * 100)}%`)
+    .join('\n') || '(skipped)'
+  const translations = input.translations
+    .map((t, i) => `${i + 1}. [${t.band}] "${t.sentence}" | reference (${uiLang}): "${t.reference}" | STUDENT: ${t.attempt ? `"${t.attempt}"` : "(said: I don't know)"}`)
+    .join('\n') || '(none)'
+
+  return `You are a warm, precise ${langName} examiner placing a new student on the CEFR scale. The student's native language is ${uiLang}.
+IMPORTANT: write every text field in ${uiLang}. Only examples are in ${langName}.
+
+## Step 1 — understanding (self-assessment, the student tapped the parts they understood)
+${understanding}
+
+## Step 2 — translation from ${langName} into ${uiLang} (checks real understanding)
+${translations}
+
+## Step 3 — essay "about me" written in ${langName}
+${input.essay ? `"${input.essay}"` : '(the student said they cannot write yet)'}
+
+## How to decide
+- Self-assessment is the weakest evidence; translations show real comprehension; the essay shows active skills.
+- Learners usually understand more than they can write: place them at the level they can actually use — mostly what the essay shows, raised by up to one level when translations prove clearly higher comprehension.
+- No essay and weak translations → A1. Never place above what at least two steps support.
+- confidence: "high" when the three steps agree, "low" when there is little evidence or they disagree.
+
+## Output
+- level: the CEFR level.
+- comment: 2–3 friendly sentences explaining the result (refer to what the student did).
+- strengths: 1–3 things the student already does well, each with a short example of the student's own correct text or an understood sentence. Empty if there is nothing.
+- focus_areas: 2–3 most useful next steps. For each: title (short), why (one encouraging sentence), example (a correct ${langName} example), prompt_hint (in English, a short description of the pattern for generating practice material).
+- about_me: a short profile of the student in ${uiLang}, written in the first person, 1–6 short sentences (max 600 characters): name, where they live and are from, work or study, family, hobbies, languages, why they learn — only what they actually said.
+  ${input.aboutMe ? `The current profile is below. Revise it: keep everything still true (the student may have edited it themselves), update what changed, add new facts. Never drop facts just because this essay doesn't mention them.
+  Current profile: "${input.aboutMe}"` : 'There is no profile yet.'}
+  ${input.essay ? '' : 'There is no essay: return the current profile unchanged (or an empty string).'}
+
+Remember: all text in ${uiLang}.`
+}
+
+export const PLACEMENT_SCHEMA = {
+  type: 'object',
+  properties: {
+    level: { type: 'string', enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] },
+    confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+    comment: { type: 'string' },
+    strengths: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { title: { type: 'string' }, example: { type: 'string' } },
+        required: ['title', 'example'],
+      },
+    },
+    focus_areas: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          why: { type: 'string' },
+          example: { type: 'string' },
+          prompt_hint: { type: 'string' },
+        },
+        required: ['title', 'why', 'example', 'prompt_hint'],
+      },
+    },
+    about_me: { type: 'string' },
+  },
+  required: ['level', 'confidence', 'comment', 'strengths', 'focus_areas', 'about_me'],
 }

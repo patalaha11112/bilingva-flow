@@ -13,6 +13,10 @@ export const LIMITS = {
   essaysPerDay: 20,
   /** Max essay length sent to the AI */
   essayMaxChars: 4000,
+  /** Level tests graded per day */
+  placementsPerDay: 5,
+  /** Max length of the "about me" text used in prompts */
+  aboutMeMaxChars: 600,
   /** Max length of a custom topic (admins only) */
   customTopicMaxChars: 80,
 } as const

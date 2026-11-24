@@ -99,6 +99,28 @@ export const TipsQuery = z.object({
   interface_lang: interfaceLang.catch(DEFAULT_INTERFACE_LANG),
 })
 
+export const PlacementQuery = z.object({
+  language: learningLang,
+  interface_lang: interfaceLang.catch(DEFAULT_INTERFACE_LANG),
+})
+
+export const PlacementBody = z.object({
+  language: learningLang,
+  interface_language: interfaceLang,
+  understand: z.array(z.object({
+    id: z.string().uuid(),
+    understood: z.number().int().min(0).max(20),
+    total: z.number().int().min(1).max(20),
+  })).max(6),
+  translations: z.array(z.object({
+    id: z.string().uuid(),
+    /** null = "I don't know" */
+    text: z.string().trim().max(1000).nullable().transform((v) => v || null),
+  })).max(3),
+  /** null = "I can't write yet" */
+  essay: z.string().trim().max(5000).nullable().transform((v) => v || null),
+})
+
 type Parsed<T> = { data: T; error: null } | { data: null; error: NextResponse }
 
 function result<T>(parsed: z.SafeParseReturnType<unknown, T>): Parsed<T> {

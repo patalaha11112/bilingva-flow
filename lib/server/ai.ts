@@ -24,6 +24,9 @@ export const AI_MODELS = {
   // Once per set; flash-lite mistranslated words here, so the better model is worth it
   essayTopic: process.env.GEMINI_MODEL_ESSAY_TOPIC || 'gemini-4-hydrogen',
   weeklyReport: process.env.GEMINI_MODEL_WEEKLY_REPORT || 'gemini-4-hydrogen',
+  // Level test: the sentence bank is built once per language pair, then each test is graded
+  placementItems: process.env.GEMINI_MODEL_PLACEMENT_ITEMS || 'gemini-4-hydrogen',
+  placement: process.env.GEMINI_MODEL_PLACEMENT || 'gemini-4-hydrogen',
 } as const
 
 const TIMEOUT_MS = 60_000

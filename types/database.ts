@@ -23,6 +23,8 @@ export interface UserProfile {
   id: string
   interface_language: InterfaceLang
   app_color: string
+  /** Free "about me" text from the level test; the user can edit or clear it */
+  about_me: string | null
   created_at: string
   updated_at: string
 }

@@ -43,18 +43,33 @@ export async function listReports(supabase: SupabaseClient, userId: string, lang
   return (data ?? []).map(toReport)
 }
 
-/** Patterns to practise from the latest report of the last two weeks */
+/** Patterns to practise: from the newest weekly report or level test of the last two weeks */
 export async function getFocusHints(supabase: SupabaseClient, userId: string, language: LearningLang): Promise<string[]> {
-  const { data } = await supabase
-    .from('weekly_reports')
-    .select('report, week_start')
-    .eq('user_id', userId)
-    .eq('language', language)
-    .gte('week_start', new Date(Date.now() - 15 * 86_400_000).toISOString().slice(0, 10))
-    .order('week_start', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  const areas = (data?.report as ReportContent | null)?.focus_areas ?? []
+  const since = new Date(Date.now() - 15 * 86_400_000).toISOString()
+  const [{ data: report }, { data: test }] = await Promise.all([
+    supabase
+      .from('weekly_reports')
+      .select('report, created_at')
+      .eq('user_id', userId)
+      .eq('language', language)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('placement_results')
+      .select('result, created_at')
+      .eq('user_id', userId)
+      .eq('language', language)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+  const latest = test && (!report || test.created_at > report.created_at)
+    ? (test.result as { focus_areas?: { prompt_hint: string }[] })
+    : (report?.report as ReportContent | null)
+  const areas = latest?.focus_areas ?? []
   return areas.map((a) => a.prompt_hint).filter(Boolean).slice(0, 3)
 }
 

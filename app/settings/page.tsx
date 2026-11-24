@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Sun, Moon } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronRight, ClipboardCheck, LogOut, Sun, Moon } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
 import { useUser } from '@/hooks/use-user'
 import { useT } from '@/hooks/use-t'
@@ -31,7 +32,7 @@ import {
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { interfaceLang: lang, learningLang, level, updateProfile, updateLevel, setActiveLanguage, isLoading } = useUser()
+  const { profile, interfaceLang: lang, learningLang, level, updateProfile, updateLevel, setActiveLanguage, isLoading } = useUser()
   const { t } = useT()
 
   const [isDark, setIsDark] = useState(false)
@@ -128,7 +129,25 @@ export default function SettingsPage() {
               />
             ))}
           </div>
+          <Link
+            href={`/level-test?language=${learningLang}`}
+            className="flex items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-3 py-3 transition-colors hover:bg-primary/10"
+          >
+            <ClipboardCheck className="h-5 w-5 flex-shrink-0 text-primary" />
+            <span className="flex-1">
+              <span className="block text-sm font-medium">{t.settings.levelTest}</span>
+              <span className="block text-xs text-muted-foreground">{t.settings.levelTestHint}</span>
+            </span>
+            <ChevronRight className="h-4 w-4 text-primary" />
+          </Link>
         </section>
+
+        {/* About me */}
+        <AboutMe
+          key={profile?.id}
+          initial={profile?.about_me ?? ''}
+          onSave={(text) => updateProfile({ about_me: text.trim() || null })}
+        />
 
         {/* Theme */}
         <section className="rounded-2xl bg-card shadow-sm p-4 space-y-3">
@@ -249,5 +268,50 @@ function LevelChip({
         {description}
       </span>
     </button>
+  )
+}
+
+// ─────────────────────────────────────────────
+// About me — one free text, filled in by the level test
+// ─────────────────────────────────────────────
+
+function AboutMe({ initial, onSave }: { initial: string; onSave: (text: string) => Promise<boolean> }) {
+  const { t } = useT()
+  const [text, setText] = useState(initial)
+  const [state, setState] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const changed = text.trim() !== initial.trim()
+
+  const save = async (value: string) => {
+    setState('saving')
+    const ok = await onSave(value)
+    setState(ok ? 'saved' : 'idle')
+  }
+
+  return (
+    <section className="rounded-2xl bg-card shadow-sm p-4 space-y-3">
+      <div>
+        <p className="text-sm font-medium">{t.settings.aboutMe}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{t.settings.aboutMeHint}</p>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => { setText(e.target.value); setState('idle') }}
+        placeholder={t.settings.aboutMePlaceholder}
+        rows={5}
+        maxLength={2000}
+        className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2.5 text-sm leading-relaxed outline-none focus:border-primary"
+      />
+      <div className="flex items-center gap-2">
+        <Button size="sm" disabled={!changed || state === 'saving'} onClick={() => save(text)}>
+          {t.settings.save}
+        </Button>
+        {text && (
+          <Button size="sm" variant="ghost" disabled={state === 'saving'} onClick={() => { setText(''); save('') }}>
+            {t.settings.clear}
+          </Button>
+        )}
+        {state === 'saved' && !changed && <span className="text-xs text-green-600 dark:text-green-400">✓ {t.settings.saved}</span>}
+      </div>
+    </section>
   )
 }

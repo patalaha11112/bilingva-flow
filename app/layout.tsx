@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Header } from '@/components/header'
 import { BottomNav } from '@/components/bottom-nav'
 import { UserProvider } from '@/hooks/use-user'
+import { OnboardingGate } from '@/components/onboarding-gate'
 import './globals.css'
 
 const geist = Geist({ subsets: ['latin'] })
@@ -45,7 +46,7 @@ export default function RootLayout({
         <UserProvider>
           <Header />
           <main className="pb-20">
-            {children}
+            <OnboardingGate>{children}</OnboardingGate>
           </main>
           <BottomNav />
         </UserProvider>

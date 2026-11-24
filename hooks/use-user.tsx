@@ -37,7 +37,7 @@ interface UserContextValue {
   today: TodayProgress
   isLoading: boolean
   error: string | null
-  updateProfile: (updates: Partial<Pick<UserProfile, 'interface_language' | 'app_color'>>) => Promise<void>
+  updateProfile: (updates: Partial<Pick<UserProfile, 'interface_language' | 'app_color' | 'about_me'>>) => Promise<boolean>
   updateLevel: (language: LearningLang, level: Level) => Promise<void>
   setActiveLanguage: (language: LearningLang) => Promise<void>
   /** Reloads everything; silent=true keeps current data on screen instead of showing loading state */
@@ -216,18 +216,21 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [interfaceLang])
 
   const updateProfile = async (
-    updates: Partial<Pick<UserProfile, 'interface_language' | 'app_color'>>
+    updates: Partial<Pick<UserProfile, 'interface_language' | 'app_color' | 'about_me'>>
   ) => {
-    if (!user) return
+    if (!user) return false
 
     const { error } = await supabase
       .from('user_profiles')
       .update(updates)
       .eq('id', user.id)
 
-    if (!error) {
-      setProfile(prev => prev ? { ...prev, ...updates } : null)
+    if (error) {
+      console.error('update profile:', error)
+      return false
     }
+    setProfile(prev => prev ? { ...prev, ...updates } : null)
+    return true
   }
 
   const updateLevel = async (language: LearningLang, level: Level) => {

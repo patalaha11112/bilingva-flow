@@ -8,6 +8,7 @@ import { getCurrentSet, loadSetSentences } from '@/lib/server/sentences'
 import { AI_MODELS, generateJson } from '@/lib/server/ai'
 import { ESSAY_TOPIC_SCHEMA, essayTopicPrompt } from '@/lib/server/prompts'
 import { getFocusHints } from '@/lib/server/reports'
+import { LIMITS, sanitizePromptText } from '@/lib/server/access'
 
 export const maxDuration = 60
 
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
               level: set.level,
               sentences: sentences.map((s: any) => ({ text: s.sentence_text, translation: s.translation })),
               focus: await getFocusHints(supabase, user.id, language),
+              aboutMe: await aboutMeForPrompt(supabase, user.id),
             }),
             ESSAY_TOPIC_SCHEMA
           )
@@ -83,4 +85,10 @@ export async function GET(request: NextRequest) {
     console.error('Topic route error:', err)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
+}
+
+async function aboutMeForPrompt(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data } = await supabase.from('user_profiles').select('about_me').eq('id', userId).maybeSingle()
+  const text = (data?.about_me as string | null) ?? ''
+  return sanitizePromptText(text, LIMITS.aboutMeMaxChars) || undefined
 }
