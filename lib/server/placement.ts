@@ -124,7 +124,11 @@ export async function gradePlacement(
   const { data: profile } = await supabase.from('user_profiles').select('about_me').eq('id', userId).maybeSingle()
   const aboutMe = (profile?.about_me as string | null)?.trim() || null
 
-  const result = await generateJson<PlacementResult>(
+  const translated = opts.translations.flatMap((t) => {
+    const item = items.get(t.id)
+    return item ? [{ band: item.level, sentence: item.sentence_text, reference: item.translation, attempt: t.text }] : []
+  })
+  const graded = await generateJson<Omit<PlacementResult, 'level'> & { translation_verdicts: string[] }>(
     AI_MODELS.placement,
     placementPrompt({
       language,
@@ -133,18 +137,23 @@ export async function gradePlacement(
         const item = items.get(u.id)
         return item ? [{ level: item.level, sentence: item.sentence_text, understood: u.total ? u.understood / u.total : 0 }] : []
       }),
-      translations: opts.translations.flatMap((t) => {
-        const item = items.get(t.id)
-        return item ? [{ band: item.level, sentence: item.sentence_text, reference: item.translation, attempt: t.text }] : []
-      }),
+      translations: translated,
       essay: opts.essay,
       aboutMe,
     }),
     PLACEMENT_SCHEMA
   )
 
-  const about = result.about_me?.trim().slice(0, 2000) || aboutMe || ''
-  const final: PlacementResult = { ...result, about_me: about }
+  const about = graded.about_me?.trim().slice(0, 2000) || aboutMe || ''
+  const { understanding, writing } = finalLevels(graded, translated, !!opts.essay)
+  const { translation_verdicts, ...rest } = graded
+  const final: PlacementResult = {
+    ...rest,
+    understanding_level: understanding,
+    writing_level: writing,
+    level: combineLevels(understanding, writing),
+    about_me: about,
+  }
 
   const admin = createAdminClient()
   await admin.from('placement_results').insert({
@@ -152,12 +161,40 @@ export async function gradePlacement(
     language,
     interface_language: interfaceLanguage,
     level_estimate: final.level,
-    result: final,
+    // The answers are kept with the result, to review how a level was reached
+    result: { ...final, answers: { understand: opts.understand, translations: opts.translations, essay: opts.essay }, translation_verdicts },
   })
   if (about && about !== aboutMe) {
     await admin.from('user_profiles').update({ about_me: about }).eq('id', userId)
   }
   return final
+}
+
+/** Understanding raised to what accurate translations prove; writing A1 without an essay */
+export function finalLevels(
+  graded: { understanding_level: Level; writing_level: Level; translation_verdicts?: string[] },
+  translated: { band: string; attempt: string | null }[],
+  hasEssay: boolean
+) {
+  const proven = translated.reduce<Level>((best, t, i) => {
+    const ok = graded.translation_verdicts?.[i] === 'accurate' && t.attempt
+    const floor: Level = t.band === 'C1' ? 'C1' : t.band === 'B2' ? 'B2' : 'A2'
+    return ok && LEVELS.indexOf(floor) > LEVELS.indexOf(best) ? floor : best
+  }, 'A1')
+  const understanding = LEVELS.indexOf(proven) > LEVELS.indexOf(graded.understanding_level) ? proven : graded.understanding_level
+  const writing: Level = hasEssay ? graded.writing_level : 'A1'
+  return { understanding, writing }
+}
+
+/**
+ * Final level from understanding and writing: their average rounded up (the
+ * app's material is mostly for reading), never above understanding.
+ * Understanding C1 + writing B2 → C1; B2 + B1 → B2; B2 + no essay (A1) → B1.
+ */
+export function combineLevels(understanding: Level, writing: Level): Level {
+  const u = LEVELS.indexOf(understanding)
+  const w = LEVELS.indexOf(writing)
+  return LEVELS[Math.min(u, Math.ceil((u + w) / 2))] ?? 'A1'
 }
 
 /** Tests taken in the last 24 hours (AI limit) */

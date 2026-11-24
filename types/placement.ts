@@ -23,7 +23,10 @@ export interface PlacementTest {
 }
 
 export interface PlacementResult {
+  /** Final level, combined by the server from the two below */
   level: Level
+  understanding_level: Level
+  writing_level: Level
   confidence: 'low' | 'medium' | 'high'
   comment: string
   strengths: { title: string; example: string }[]

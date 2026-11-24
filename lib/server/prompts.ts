@@ -497,14 +497,22 @@ ${translations}
 ${input.essay ? `"${input.essay}"` : '(the student said they cannot write yet)'}
 
 ## How to decide
-- Self-assessment is the weakest evidence; translations show real comprehension; the essay shows active skills.
-- Learners usually understand more than they can write: place them at the level they can actually use — mostly what the essay shows, raised by up to one level when translations prove clearly higher comprehension.
-- No essay and weak translations → A1. Never place above what at least two steps support.
-- confidence: "high" when the three steps agree, "low" when there is little evidence or they disagree.
+Give two separate CEFR levels; the app combines them.
+- understanding_level: what the student can really understand, from steps 1 and 2.
+  Translations are the strongest evidence: an accurate translation (meaning right, wording may differ) of the B1–B2 sentence shows at least B2 comprehension; of the C1–C2 sentence, at least C1.
+  Self-assessment supports this, but alone it can raise the level by at most one band above what translations prove.
+- writing_level: what the essay shows, judged by the LANGUAGE, not the topic. A text about oneself is naturally simple in content;
+  judge grammar range (tenses, conditionals, relative and subordinate clauses), connectors, vocabulary range and naturalness, accuracy and length.
+  A fluent, natural text with varied structures and few errors is B2 or higher even if the topic is everyday life. A1 if there is no essay.
+- confidence: "high" when the steps agree, "low" when there is little evidence or they disagree.
 
 ## Output
-- level: the CEFR level.
-- comment: 2–3 friendly sentences explaining the result (refer to what the student did).
+- translation_verdicts: for each translation above, in order, judge MEANING only — never style:
+  "accurate": a reader would understand the same thing as from the reference. Synonyms, different word order, simpler wording, small grammar slips in ${uiLang} are all still "accurate" (e.g. "вечером" for "по вечерам", "показывает" for "представлена").
+  "partial": a key piece of meaning (a main word or the relation between parts) is missing or wrong.
+  "wrong": the meaning is lost, or the student said "I don't know".
+- understanding_level, writing_level: as above.
+- comment: 2–3 friendly sentences on what the student showed in understanding and in writing (refer to what they did).
 - strengths: 1–3 things the student already does well, each with a short example of the student's own correct text or an understood sentence. Empty if there is nothing.
 - focus_areas: 2–3 most useful next steps. For each: title (short), why (one encouraging sentence), example (a correct ${langName} example), prompt_hint (in English, a short description of the pattern for generating practice material).
 - about_me: a short profile of the student in ${uiLang}, written in the first person, 1–6 short sentences (max 600 characters): name, where they live and are from, work or study, family, hobbies, languages, why they learn — only what they actually said.
@@ -518,7 +526,9 @@ Remember: all text in ${uiLang}.`
 export const PLACEMENT_SCHEMA = {
   type: 'object',
   properties: {
-    level: { type: 'string', enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] },
+    translation_verdicts: { type: 'array', items: { type: 'string', enum: ['accurate', 'partial', 'wrong'] } },
+    understanding_level: { type: 'string', enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] },
+    writing_level: { type: 'string', enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] },
     confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
     comment: { type: 'string' },
     strengths: {
@@ -544,5 +554,5 @@ export const PLACEMENT_SCHEMA = {
     },
     about_me: { type: 'string' },
   },
-  required: ['level', 'confidence', 'comment', 'strengths', 'focus_areas', 'about_me'],
+  required: ['translation_verdicts', 'understanding_level', 'writing_level', 'confidence', 'comment', 'strengths', 'focus_areas', 'about_me'],
 }
