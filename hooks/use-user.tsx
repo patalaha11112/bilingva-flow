@@ -223,15 +223,31 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const updateLevel = async (language: LearningLang, level: Level) => {
     if (!user) return
 
-    const { error } = await supabase
+    const update = () => supabase
       .from('user_language_settings')
       .update({ level, level_confirmed_at: new Date().toISOString() })
       .eq('user_id', user.id)
       .eq('learning_language', language)
+      .select()
+      .maybeSingle()
 
-    if (!error && activeLanguage?.learning_language === language) {
-      setActiveLanguageState(prev => prev ? { ...prev, level } : null)
+    let { data, error } = await update()
+    // A new account has no settings row yet: create it (as the active language), then set the level
+    if (!error && !data) {
+      const { error: rpcError } = await supabase.rpc('set_active_language', { p_language: language })
+      if (rpcError) {
+        console.error('activate language:', rpcError)
+        return
+      }
+      ;({ data, error } = await update())
     }
+    if (error) {
+      console.error('update level:', error)
+      return
+    }
+
+    const row = data as UserLanguageSettings | null
+    if (row?.is_active) setActiveLanguageState(row)
   }
 
   const setActiveLanguage = async (language: LearningLang) => {
