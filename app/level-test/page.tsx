@@ -187,18 +187,6 @@ function LevelTest() {
               <Volume2 className="h-4 w-4" />
             </button>
           </div>
-          <button
-            onClick={() => setSelected(allSelected ? new Set() : new Set(item.parts.map((_, i) => i)))}
-            className="flex items-center gap-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <span className={cn(
-              'flex h-4 w-4 items-center justify-center rounded border transition-colors',
-              allSelected ? 'border-green-500 bg-green-500 text-white' : 'border-muted-foreground/40'
-            )}>
-              {allSelected && <Check className="h-3 w-3" />}
-            </span>
-            {ui.selectAll}
-          </button>
           <div className="flex flex-wrap gap-2">
             {item.parts.map((part, i) => {
               const on = selected.has(i)
@@ -221,6 +209,20 @@ function LevelTest() {
                 </button>
               )
             })}
+          </div>
+          <div className="flex">
+            <button
+              onClick={() => setSelected(allSelected ? new Set() : new Set(item.parts.map((_, i) => i)))}
+              className="ml-auto flex items-center gap-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <span className={cn(
+                'flex h-4 w-4 items-center justify-center rounded border transition-colors',
+                allSelected ? 'border-green-500 bg-green-500 text-white' : 'border-muted-foreground/40'
+              )}>
+                {allSelected && <Check className="h-3 w-3" />}
+              </span>
+              {ui.selectAll}
+            </button>
           </div>
         </div>
         <Button className="h-12 w-full text-base" onClick={() => answerUnderstand(selected.size)}>
