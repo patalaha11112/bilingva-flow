@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { cacheClear } from '@/lib/client-cache'
 import {
   INTERFACE_LANGUAGES,
   INTERFACE_LANG_CODES,
@@ -32,7 +33,7 @@ import {
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { profile, interfaceLang: lang, learningLang, level, updateProfile, updateLevel, setActiveLanguage, isLoading } = useUser()
+  const { profile, interfaceLang: lang, learningLang, level, updateProfile, updateLevel, setActiveLanguage, isLoading, refetch } = useUser()
   const { t } = useT()
 
   const [isDark, setIsDark] = useState(false)
@@ -52,6 +53,24 @@ export default function SettingsPage() {
       document.documentElement.classList.remove('dark')
       localStorage.setItem('theme', 'light')
     }
+  }
+
+  const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState(false)
+
+  // Wipes progress and settings; with no learning language the app opens the welcome screen
+  const handleReset = async () => {
+    setResetting(true)
+    setResetError(false)
+    const res = await fetch('/api/account/reset', { method: 'POST' }).catch(() => null)
+    if (!res?.ok) {
+      setResetError(true)
+      setResetting(false)
+      return
+    }
+    cacheClear()
+    await refetch()
+    router.replace('/welcome')
   }
 
   const handleLogout = async () => {
@@ -185,8 +204,8 @@ export default function SettingsPage() {
           <p className="text-sm font-medium text-destructive">{t.settings.resetProgress}</p>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="w-full">
-                {t.settings.reset}
+              <Button variant="destructive" className="w-full" disabled={resetting}>
+                {resetting ? t.common.loading : t.settings.reset}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -198,12 +217,13 @@ export default function SettingsPage() {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
-                <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
+                <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={handleReset}>
                   {t.common.confirm}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          {resetError && <p className="text-sm text-destructive">{t.common.error}</p>}
         </section>
 
       </div>

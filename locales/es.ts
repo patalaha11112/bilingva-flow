@@ -113,7 +113,7 @@ export const es: Messages = {
     resetProgress: 'Restablecer progreso',
     reset: 'Restablecer',
     resetConfirmTitle: '¿Restablecer progreso?',
-    resetConfirmMessage: 'Todos los datos serán eliminados. Esta acción no se puede deshacer.',
+    resetConfirmMessage: 'Se borrarán tu progreso, los resultados de las pruebas, los idiomas elegidos y «Sobre mí», y la aplicación empezará de nuevo desde la pantalla de bienvenida. No se puede deshacer.',
     levelTest: 'Hacer la prueba de nivel',
     levelTestHint: 'Unos 10 minutos: comprensión, traducción y unas líneas sobre ti',
     aboutMe: 'Sobre mí',

@@ -113,7 +113,7 @@ export const en: Messages = {
     resetProgress: 'Reset progress',
     reset: 'Reset',
     resetConfirmTitle: 'Reset progress?',
-    resetConfirmMessage: 'All data will be deleted. This cannot be undone.',
+    resetConfirmMessage: 'Your progress, test results, chosen languages and “About me” will be deleted, and the app will start again from the welcome screen. This cannot be undone.',
     levelTest: 'Take the level test',
     levelTestHint: 'About 10 minutes: understanding, translation and a few lines about you',
     aboutMe: 'About me',

@@ -508,7 +508,7 @@ Give two separate CEFR levels; the app combines them.
 
 ## Output
 - translation_verdicts: for each translation above, in order, judge MEANING only — never style:
-  "accurate": a reader would understand the same thing as from the reference. Synonyms, different word order, simpler wording, small grammar slips in ${uiLang} are all still "accurate" (e.g. "вечером" for "по вечерам", "показывает" for "представлена").
+  "accurate": a reader would understand the same thing as from the reference. Synonyms, different word order, simpler wording, small grammar slips in ${uiLang} are all still "accurate" (e.g. "in the evening" for "in the evenings", "shows" for "presents").
   "partial": a key piece of meaning (a main word or the relation between parts) is missing or wrong.
   "wrong": the meaning is lost, or the student said "I don't know".
 - understanding_level, writing_level: as above.
